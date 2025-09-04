@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   BarChart,
   Bar,
@@ -21,82 +22,7 @@ const MembersDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Mock data for demonstration
-  const mockMembers = [
-    {
-      id: 1,
-      name: 'John Doe',
-      email: 'john@example.com',
-      group: 'Football Team A',
-      joinDate: '2024-01-01',
-      activities: 12,
-      status: 'Active',
-    },
-    {
-      id: 2,
-      name: 'Jane Smith',
-      email: 'jane@example.com',
-      group: 'Basketball Squad',
-      joinDate: '2024-01-05',
-      activities: 8,
-      status: 'Active',
-    },
-    {
-      id: 3,
-      name: 'Mike Johnson',
-      email: 'mike@example.com',
-      group: 'Swimming Club',
-      joinDate: '2024-01-10',
-      activities: 15,
-      status: 'Active',
-    },
-    {
-      id: 4,
-      name: 'Sarah Wilson',
-      email: 'sarah@example.com',
-      group: 'Tennis Group',
-      joinDate: '2024-01-15',
-      activities: 6,
-      status: 'Inactive',
-    },
-    {
-      id: 5,
-      name: 'David Brown',
-      email: 'david@example.com',
-      group: 'Volleyball Team',
-      joinDate: '2024-01-20',
-      activities: 10,
-      status: 'Active',
-    },
-    {
-      id: 6,
-      name: 'Lisa Davis',
-      email: 'lisa@example.com',
-      group: 'Running Club',
-      joinDate: '2024-01-25',
-      activities: 18,
-      status: 'Active',
-    },
-    {
-      id: 7,
-      name: 'Tom Anderson',
-      email: 'tom@example.com',
-      group: 'Football Team A',
-      joinDate: '2024-01-30',
-      activities: 5,
-      status: 'Active',
-    },
-    {
-      id: 8,
-      name: 'Emma Taylor',
-      email: 'emma@example.com',
-      group: 'Swimming Club',
-      joinDate: '2024-02-01',
-      activities: 9,
-      status: 'Active',
-    },
-  ];
-
+  const API_ENDPOINT = 'https://apptavn-ynfcnag4xa-uc.a.run.app/activities';
   const COLORS = [
     '#0088FE',
     '#00C49F',
@@ -107,17 +33,75 @@ const MembersDashboard = () => {
   ];
 
   useEffect(() => {
-    // Simulate API call
     const fetchMembers = async () => {
       try {
         setLoading(true);
-        setTimeout(() => {
-          setMembers(mockMembers);
-          setLoading(false);
-        }, 1000);
-      } catch (err) {
-        setError('Failed to fetch members');
+        console.log('Fetching activities from:', API_ENDPOINT);
+        const response = await axios.get(API_ENDPOINT);
+        console.log('API Response:', response.data);
+
+        // Process activities to extract member data
+        if (!response.data || !Array.isArray(response.data)) {
+          throw new Error('Invalid API response format');
+        }
+
+        const memberData = response.data.reduce((acc, activity) => {
+          // Add safety checks for activity structure
+          if (!activity || !activity.athlete) {
+            console.warn(
+              'Skipping activity with missing athlete data:',
+              activity
+            );
+            return acc;
+          }
+
+          const memberName = `${activity.athlete?.firstname} ${activity.athlete?.lastname}`;
+          const teamName = activity.athlete?.team || 'No Team';
+
+          if (!acc[memberName]) {
+            acc[memberName] = {
+              name: memberName,
+              team: teamName,
+              activities: 0,
+              totalDistance: 0,
+              activitiesList: [],
+            };
+          }
+          acc[memberName].activities += 1;
+          acc[memberName].totalDistance += activity.distance || 0;
+          acc[memberName].activitiesList.push(activity);
+          return acc;
+        }, {});
+
+        console.log('Processed member data:', memberData);
+
+        // Convert to array and add calculated fields
+        const formattedMembers = Object.values(memberData).map(
+          (member, index) => ({
+            id: index + 1,
+            name: member.name,
+            team: member.team,
+            activities: member.activities,
+            totalDistance:
+              Math.round((member.totalDistance / 1000) * 100) / 100,
+            averageDistance: Math.round(
+              member.totalDistance / member.activities
+            ),
+            status: 'Active', // All members are considered active
+            joinDate: '2024-01-01', // Default date since not available in API
+          })
+        );
+
+        console.log('Formatted members:', formattedMembers);
+
+        setMembers(formattedMembers);
         setLoading(false);
+      } catch (err) {
+        console.error('Error fetching members:', err);
+        setError(`Failed to fetch member data: ${err.message}`);
+        setLoading(false);
+        // Set empty members array as fallback
+        setMembers([]);
       }
     };
 
@@ -129,6 +113,7 @@ const MembersDashboard = () => {
     (acc, member) => {
       acc.totalMembers += 1;
       acc.totalActivities += member.activities;
+      acc.totalDistance += member.totalDistance;
       acc.activeMembers += member.status === 'Active' ? 1 : 0;
       acc.inactiveMembers += member.status === 'Inactive' ? 1 : 0;
       return acc;
@@ -136,19 +121,20 @@ const MembersDashboard = () => {
     {
       totalMembers: 0,
       totalActivities: 0,
+      totalDistance: 0,
       activeMembers: 0,
       inactiveMembers: 0,
     }
   );
 
-  const groupDistribution = members.reduce((acc, member) => {
-    acc[member.group] = (acc[member.group] || 0) + 1;
+  const teamDistribution = members.reduce((acc, member) => {
+    acc[member.team] = (acc[member.team] || 0) + 1;
     return acc;
   }, {});
 
-  const groupChartData = Object.entries(groupDistribution).map(
-    ([group, count]) => ({
-      group: group.length > 15 ? group.substring(0, 15) + '...' : group,
+  const teamChartData = Object.entries(teamDistribution).map(
+    ([team, count]) => ({
+      team: team.length > 15 ? team.substring(0, 15) + '...' : team,
       members: count,
     })
   );
@@ -162,27 +148,66 @@ const MembersDashboard = () => {
     .map((member) => ({
       name: member.name.split(' ')[0], // First name only for chart
       activities: member.activities,
+      distance: member.totalDistance,
     }))
     .sort((a, b) => b.activities - a.activities)
     .slice(0, 6); // Top 6 members
 
-  const monthlyJoins = members.reduce((acc, member) => {
-    const month = member.joinDate.substring(0, 7); // YYYY-MM
-    acc[month] = (acc[month] || 0) + 1;
-    return acc;
-  }, {});
-
-  const monthlyData = Object.entries(monthlyJoins)
-    .map(([month, count]) => ({
-      month,
-      joins: count,
+  const distanceDistribution = members
+    .map((member) => ({
+      name: member.name.split(' ')[0], // First name only for chart
+      distance: member.totalDistance,
     }))
-    .sort((a, b) => a.month.localeCompare(b.month));
+    .sort((a, b) => b.distance - a.distance)
+    .slice(0, 6); // Top 6 members
 
   const averageActivities =
     memberStats.totalMembers > 0
       ? Math.round(memberStats.totalActivities / memberStats.totalMembers)
       : 0;
+
+  const averageDistance =
+    memberStats.totalMembers > 0
+      ? Math.round(
+          (memberStats.totalDistance / memberStats.totalMembers) * 100
+        ) / 100
+      : 0;
+
+  // Process data for team member breakdown
+  const teamMemberBreakdown = members.reduce((acc, member) => {
+    if (!member || !member.team) {
+      console.warn('Skipping member with missing team data:', member);
+      return acc;
+    }
+
+    const teamName = member.team;
+    if (!acc[teamName]) {
+      acc[teamName] = {
+        teamName,
+        members: [],
+        totalActivities: 0,
+        totalDistance: 0,
+        memberCount: 0,
+      };
+    }
+    acc[teamName].members.push(member);
+    acc[teamName].totalActivities += member.activities || 0;
+    acc[teamName].totalDistance += member.totalDistance || 0;
+    acc[teamName].memberCount += 1;
+    return acc;
+  }, {});
+
+  const teamBreakdownData = Object.values(teamMemberBreakdown).map((team) => ({
+    ...team,
+    averageActivities:
+      team.memberCount > 0
+        ? Math.round(team.totalActivities / team.memberCount)
+        : 0,
+    averageDistance:
+      team.memberCount > 0
+        ? Math.round((team.totalDistance / team.memberCount) * 100) / 100
+        : 0,
+  }));
 
   if (loading) {
     return (
@@ -212,20 +237,18 @@ const MembersDashboard = () => {
           <div className="stat-label">Avg Activities/Member</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">
-            {Object.keys(groupDistribution).length}
-          </div>
-          <div className="stat-label">Groups Represented</div>
+          <div className="stat-value">{averageDistance.toFixed(2)}km</div>
+          <div className="stat-label">Avg Distance/Member</div>
         </div>
       </div>
 
       <div className="dashboard-grid">
         <div className="chart-container">
-          <h3 className="chart-title">Members by Group</h3>
+          <h3 className="chart-title">Members by Team</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={groupChartData}>
+            <BarChart data={teamChartData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="group" />
+              <XAxis dataKey="team" />
               <YAxis />
               <Tooltip />
               <Bar dataKey="members" fill="#667eea" />
@@ -274,41 +297,194 @@ const MembersDashboard = () => {
         </div>
 
         <div className="chart-container">
-          <h3 className="chart-title">Monthly Member Joins</h3>
+          <h3 className="chart-title">Top Distance Members</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={monthlyData}>
+            <BarChart data={distanceDistribution}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
+              <XAxis dataKey="name" />
               <YAxis />
-              <Tooltip />
-              <Area
-                type="monotone"
-                dataKey="joins"
-                stroke="#8884D8"
-                fill="#8884D8"
-                fillOpacity={0.3}
+              <Tooltip
+                formatter={(value) => [`${value} km`, 'Total Distance']}
               />
-            </AreaChart>
+              <Bar dataKey="distance" fill="#FFBB28" />
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       <div className="dashboard-card">
         <div className="card-header">
-          <h3 className="card-title">Members Table</h3>
+          <h3 className="card-title">Team Member Breakdown</h3>
           <span className="card-subtitle">
-            All members and their activity details
+            Members organized by team with team statistics
+          </span>
+        </div>
+        {teamBreakdownData.length > 0 ? (
+          teamBreakdownData.map((team) => (
+            <div key={team.teamName} style={{ marginBottom: '2rem' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '1rem',
+                  padding: '1rem',
+                  backgroundColor: '#f8fafc',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                }}
+              >
+                <h4
+                  style={{
+                    margin: 0,
+                    color: '#2d3748',
+                    fontSize: '1.25rem',
+                    fontWeight: '600',
+                  }}
+                >
+                  {team.teamName}
+                </h4>
+                <div style={{ display: 'flex', gap: '2rem' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div
+                      style={{
+                        fontSize: '1.5rem',
+                        fontWeight: '700',
+                        color: '#667eea',
+                      }}
+                    >
+                      {team.memberCount}
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: '#718096' }}>
+                      Members
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div
+                      style={{
+                        fontSize: '1.5rem',
+                        fontWeight: '700',
+                        color: '#00C49F',
+                      }}
+                    >
+                      {team.totalActivities}
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: '#718096' }}>
+                      Activities
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div
+                      style={{
+                        fontSize: '1.5rem',
+                        fontWeight: '700',
+                        color: '#FFBB28',
+                      }}
+                    >
+                      {team.totalDistance.toFixed(2)}km
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: '#718096' }}>
+                      Total Distance
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div
+                      style={{
+                        fontSize: '1.5rem',
+                        fontWeight: '700',
+                        color: '#8884D8',
+                      }}
+                    >
+                      {team.averageDistance.toFixed(2)}km
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: '#718096' }}>
+                      Avg Distance
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Member</th>
+                    <th>Activities</th>
+                    <th>Total Distance (km)</th>
+                    <th>Avg Distance (km)</th>
+                    <th>Activity Level</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {team.members.map((member) => (
+                    <tr key={member.id}>
+                      <td style={{ fontWeight: '600' }}>{member.name}</td>
+                      <td>{member.activities}</td>
+                      <td style={{ fontWeight: '600', color: '#2d3748' }}>
+                        {member.totalDistance.toFixed(2)} km
+                      </td>
+                      <td>
+                        {Math.round((member.averageDistance / 1000) * 100) /
+                          100}{' '}
+                        km
+                      </td>
+                      <td>
+                        <span
+                          style={{
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '8px',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            backgroundColor:
+                              member.activities >= 10
+                                ? '#e6fffa'
+                                : member.activities >= 5
+                                ? '#fef5e7'
+                                : '#fed7d7',
+                            color:
+                              member.activities >= 10
+                                ? '#00a085'
+                                : member.activities >= 5
+                                ? '#d69e2e'
+                                : '#c53030',
+                          }}
+                        >
+                          {member.activities >= 10
+                            ? 'High'
+                            : member.activities >= 5
+                            ? 'Medium'
+                            : 'Low'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))
+        ) : (
+          <div
+            style={{ textAlign: 'center', padding: '2rem', color: '#718096' }}
+          >
+            No team data available
+          </div>
+        )}
+      </div>
+
+      <div className="dashboard-card">
+        <div className="card-header">
+          <h3 className="card-title">All Members Table</h3>
+          <span className="card-subtitle">
+            Complete list of all members and their activity details
           </span>
         </div>
         <table className="data-table">
           <thead>
             <tr>
               <th>Name</th>
-              <th>Email</th>
-              <th>Group</th>
+              <th>Team</th>
               <th>Activities</th>
+              <th>Total Distance (km)</th>
+              <th>Avg Distance (km)</th>
               <th>Status</th>
-              <th>Join Date</th>
               <th>Activity Level</th>
             </tr>
           </thead>
@@ -316,7 +492,6 @@ const MembersDashboard = () => {
             {members.map((member) => (
               <tr key={member.id}>
                 <td style={{ fontWeight: '600' }}>{member.name}</td>
-                <td>{member.email}</td>
                 <td>
                   <span
                     style={{
@@ -328,10 +503,14 @@ const MembersDashboard = () => {
                       color: '#667eea',
                     }}
                   >
-                    {member.group}
+                    {member.team}
                   </span>
                 </td>
                 <td>{member.activities}</td>
+                <td style={{ fontWeight: '600', color: '#2d3748' }}>
+                  {member.totalDistance.toFixed(2)} km
+                </td>
+                <td>{(member.averageDistance / 1000).toFixed(2)} km</td>
                 <td>
                   <span
                     style={{
@@ -347,7 +526,6 @@ const MembersDashboard = () => {
                     {member.status}
                   </span>
                 </td>
-                <td>{member.joinDate}</td>
                 <td>
                   <span
                     style={{
