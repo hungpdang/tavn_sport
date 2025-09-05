@@ -57,6 +57,7 @@ const MembersDashboard = () => {
 
           const memberName = `${activity.athlete?.firstname} ${activity.athlete?.lastname}`;
           const teamName = activity.athlete?.team || 'No Team';
+          const dayMonth = activity.daymonth || 'Unknown';
 
           if (!acc[memberName]) {
             acc[memberName] = {
@@ -65,11 +66,25 @@ const MembersDashboard = () => {
               activities: 0,
               totalDistance: 0,
               activitiesList: [],
+              dailyActivities: {},
             };
           }
           acc[memberName].activities += 1;
           acc[memberName].totalDistance += activity.distance || 0;
           acc[memberName].activitiesList.push(activity);
+
+          // Track daily activities
+          if (!acc[memberName].dailyActivities[dayMonth]) {
+            acc[memberName].dailyActivities[dayMonth] = {
+              dayMonth,
+              activities: 0,
+              distance: 0,
+            };
+          }
+          acc[memberName].dailyActivities[dayMonth].activities += 1;
+          acc[memberName].dailyActivities[dayMonth].distance +=
+            activity.distance || 0;
+
           return acc;
         }, {});
 
@@ -467,6 +482,130 @@ const MembersDashboard = () => {
             No team data available
           </div>
         )}
+      </div>
+
+      <div className="dashboard-card">
+        <div className="card-header">
+          <h3 className="card-title">Daily Member Activity</h3>
+          <span className="card-subtitle">
+            Member activities organized by day
+          </span>
+        </div>
+        {members.map((member) => {
+          const dailyData = Object.values(member.dailyActivities || {})
+            .sort((a, b) => b.distance - a.distance)
+            .map((day) => ({
+              ...day,
+              formattedDate: day.dayMonth
+                ? `${day.dayMonth.substring(2, 4)}/${day.dayMonth.substring(
+                    0,
+                    2
+                  )}`
+                : 'Unknown',
+              distanceKm: (day.distance / 1000).toFixed(2),
+            }));
+
+          if (dailyData.length === 0) return null;
+
+          return (
+            <div key={member.id} style={{ marginBottom: '2rem' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '1rem',
+                  padding: '1rem',
+                  backgroundColor: '#f8fafc',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                }}
+              >
+                <h4
+                  style={{
+                    margin: 0,
+                    color: '#2d3748',
+                    fontSize: '1.25rem',
+                    fontWeight: '600',
+                  }}
+                >
+                  {member.name} - Daily Activities
+                </h4>
+                <div style={{ display: 'flex', gap: '2rem' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div
+                      style={{
+                        fontSize: '1.5rem',
+                        fontWeight: '700',
+                        color: '#667eea',
+                      }}
+                    >
+                      {dailyData.length}
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: '#718096' }}>
+                      Active Days
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div
+                      style={{
+                        fontSize: '1.5rem',
+                        fontWeight: '700',
+                        color: '#00C49F',
+                      }}
+                    >
+                      {member.activities}
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: '#718096' }}>
+                      Total Activities
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div
+                      style={{
+                        fontSize: '1.5rem',
+                        fontWeight: '700',
+                        color: '#FFBB28',
+                      }}
+                    >
+                      {member.totalDistance.toFixed(2)}km
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: '#718096' }}>
+                      Total Distance
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Activities</th>
+                    <th>Distance (km)</th>
+                    <th>Avg Distance (km)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dailyData.map((day) => (
+                    <tr key={day.dayMonth}>
+                      <td style={{ fontWeight: '600' }}>{day.formattedDate}</td>
+                      <td>{day.activities}</td>
+                      <td style={{ fontWeight: '600', color: '#2d3748' }}>
+                        {day.distanceKm} km
+                      </td>
+                      <td>
+                        {day.activities > 0
+                          ? (day.distance / day.activities / 1000).toFixed(2)
+                          : '0.00'}{' '}
+                        km
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })}
       </div>
 
       <div className="dashboard-card">

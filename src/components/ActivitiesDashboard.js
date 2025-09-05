@@ -60,6 +60,37 @@ const ActivitiesDashboard = () => {
     return acc;
   }, {});
 
+  // Process data for daily activity records
+  const dailyActivities = activities.reduce((acc, activity) => {
+    const dayMonth = activity.daymonth || 'Unknown';
+    if (!acc[dayMonth]) {
+      acc[dayMonth] = {
+        dayMonth,
+        activities: [],
+        totalDistance: 0,
+        athleteCount: 0,
+        athletes: new Set(),
+        teamCount: 0,
+        teams: new Set(),
+      };
+    }
+    acc[dayMonth].activities.push(activity);
+    acc[dayMonth].totalDistance += activity.distance || 0;
+    acc[dayMonth].athletes.add(
+      `${activity.athlete?.firstname} ${activity.athlete?.lastname}`
+    );
+    acc[dayMonth].teams.add(activity.athlete?.team || 'No Team');
+    return acc;
+  }, {});
+
+  // Convert Set to count for daily data
+  Object.values(dailyActivities).forEach((day) => {
+    day.athleteCount = day.athletes.size;
+    day.teamCount = day.teams.size;
+    delete day.athletes;
+    delete day.teams;
+  });
+
   // Process data for team distance leaderboard
   const teamDistances = activities.reduce((acc, activity) => {
     const teamName = activity.athlete?.team || 'No Team';
@@ -111,6 +142,19 @@ const ActivitiesDashboard = () => {
       averageDistancePerAthlete: Math.round(
         team.totalDistance / team.athleteCount
       ),
+    }));
+
+  // Sort daily activities by total distance (descending)
+  const dailyLeaderboardData = Object.values(dailyActivities)
+    .sort((a, b) => b.totalDistance - a.totalDistance)
+    .map((day, index) => ({
+      ...day,
+      rank: index + 1,
+      totalDistanceKm: Math.round((day.totalDistance / 1000) * 100) / 100,
+      averageDistance: Math.round(day.totalDistance / day.activities.length),
+      formattedDate: day.dayMonth
+        ? `${day.dayMonth.substring(2, 4)}/${day.dayMonth.substring(0, 2)}`
+        : 'Unknown',
     }));
 
   // Calculate statistics based on actual API data
@@ -209,6 +253,37 @@ const ActivitiesDashboard = () => {
             </BarChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+      <div className="chart-container">
+        <h3 className="chart-title">Daily Activity Trends</h3>
+        <ResponsiveContainer width="100%" height={400}>
+          <BarChart
+            data={dailyLeaderboardData.map((day) => ({
+              date: day.formattedDate,
+              distance: day.totalDistanceKm,
+              activities: day.activities.length,
+              athletes: day.athleteCount,
+            }))}
+          >
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="date" />
+            <YAxis />
+            <Tooltip
+              formatter={(value, name) => [
+                name === 'distance' ? `${value} km` : value,
+                name === 'distance'
+                  ? 'Total Distance'
+                  : name === 'activities'
+                  ? 'Activities'
+                  : 'Athletes',
+              ]}
+            />
+            <Bar dataKey="distance" fill="#667eea" name="Total Distance" />
+            <Bar dataKey="activities" fill="#00C49F" name="Activities" />
+            <Bar dataKey="athletes" fill="#FFBB28" name="Athletes" />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
 
       <div className="dashboard-card">
@@ -356,6 +431,67 @@ const ActivitiesDashboard = () => {
                 <td>{team.activityCount}</td>
                 <td>{team.athleteCount}</td>
                 <td>{(team.averageDistancePerAthlete / 1000).toFixed(2)} km</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="dashboard-card">
+        <div className="card-header">
+          <h3 className="card-title">Daily Activity Records</h3>
+          <span className="card-subtitle">
+            Activities organized by day with daily statistics
+          </span>
+        </div>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Date</th>
+              <th>Total Distance (km)</th>
+              <th>Activities</th>
+              <th>Athletes</th>
+              <th>Teams</th>
+              <th>Avg Distance (km)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {dailyLeaderboardData.map((day) => (
+              <tr key={day.dayMonth}>
+                <td>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      backgroundColor:
+                        day.rank === 1
+                          ? '#FFD700'
+                          : day.rank === 2
+                          ? '#C0C0C0'
+                          : day.rank === 3
+                          ? '#CD7F32'
+                          : '#f0f4ff',
+                      color: day.rank <= 3 ? 'white' : '#667eea',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                    }}
+                  >
+                    {day.rank}
+                  </span>
+                </td>
+                <td style={{ fontWeight: '600' }}>{day.formattedDate}</td>
+                <td style={{ fontWeight: '600', color: '#2d3748' }}>
+                  {day.totalDistanceKm.toFixed(2)} km
+                </td>
+                <td>{day.activities.length}</td>
+                <td>{day.athleteCount}</td>
+                <td>{day.teamCount}</td>
+                <td>{(day.averageDistance / 1000).toFixed(2)} km</td>
               </tr>
             ))}
           </tbody>

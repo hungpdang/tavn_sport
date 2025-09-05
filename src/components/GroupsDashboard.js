@@ -32,6 +32,8 @@ const GroupsDashboard = () => {
         // Process activities to extract team data
         const teamData = response.data.reduce((acc, activity) => {
           const teamName = activity.athlete?.team || 'No Team';
+          const dayMonth = activity.daymonth || 'Unknown';
+
           if (!acc[teamName]) {
             acc[teamName] = {
               name: teamName,
@@ -39,6 +41,7 @@ const GroupsDashboard = () => {
               activities: 0,
               totalDistance: 0,
               status: 'Active', // All teams are considered active
+              dailyActivities: {},
             };
           }
           acc[teamName].members.add(
@@ -46,6 +49,23 @@ const GroupsDashboard = () => {
           );
           acc[teamName].activities += 1;
           acc[teamName].totalDistance += activity.distance || 0;
+
+          // Track daily activities
+          if (!acc[teamName].dailyActivities[dayMonth]) {
+            acc[teamName].dailyActivities[dayMonth] = {
+              dayMonth,
+              activities: 0,
+              distance: 0,
+              members: new Set(),
+            };
+          }
+          acc[teamName].dailyActivities[dayMonth].activities += 1;
+          acc[teamName].dailyActivities[dayMonth].distance +=
+            activity.distance || 0;
+          acc[teamName].dailyActivities[dayMonth].members.add(
+            `${activity.athlete?.firstname} ${activity.athlete?.lastname}`
+          );
+
           return acc;
         }, {});
 
@@ -269,6 +289,133 @@ const GroupsDashboard = () => {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="dashboard-card">
+        <div className="card-header">
+          <h3 className="card-title">Daily Team Activity</h3>
+          <span className="card-subtitle">
+            Team activities organized by day
+          </span>
+        </div>
+        {teams.map((team) => {
+          const dailyData = Object.values(team.dailyActivities || {})
+            .sort((a, b) => b.distance - a.distance)
+            .map((day) => ({
+              ...day,
+              formattedDate: day.dayMonth
+                ? `${day.dayMonth.substring(2, 4)}/${day.dayMonth.substring(
+                    0,
+                    2
+                  )}`
+                : 'Unknown',
+              distanceKm: (day.distance / 1000).toFixed(2),
+              memberCount: day.members ? day.members.size : 0,
+            }));
+
+          if (dailyData.length === 0) return null;
+
+          return (
+            <div key={team.name} style={{ marginBottom: '2rem' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '1rem',
+                  padding: '1rem',
+                  backgroundColor: '#f8fafc',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                }}
+              >
+                <h4
+                  style={{
+                    margin: 0,
+                    color: '#2d3748',
+                    fontSize: '1.25rem',
+                    fontWeight: '600',
+                  }}
+                >
+                  {team.name} - Daily Activities
+                </h4>
+                <div style={{ display: 'flex', gap: '2rem' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div
+                      style={{
+                        fontSize: '1.5rem',
+                        fontWeight: '700',
+                        color: '#667eea',
+                      }}
+                    >
+                      {dailyData.length}
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: '#718096' }}>
+                      Active Days
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div
+                      style={{
+                        fontSize: '1.5rem',
+                        fontWeight: '700',
+                        color: '#00C49F',
+                      }}
+                    >
+                      {team.activities}
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: '#718096' }}>
+                      Total Activities
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div
+                      style={{
+                        fontSize: '1.5rem',
+                        fontWeight: '700',
+                        color: '#FFBB28',
+                      }}
+                    >
+                      {team.totalDistanceKm.toFixed(2)}km
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: '#718096' }}>
+                      Total Distance
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Activities</th>
+                    <th>Distance (km)</th>
+                    <th>Active Members</th>
+                    <th>Avg Distance (km)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dailyData.map((day) => (
+                    <tr key={day.dayMonth}>
+                      <td style={{ fontWeight: '600' }}>{day.formattedDate}</td>
+                      <td>{day.activities}</td>
+                      <td style={{ fontWeight: '600', color: '#2d3748' }}>
+                        {day.distanceKm} km
+                      </td>
+                      <td>{day.memberCount}</td>
+                      <td>
+                        {day.activities > 0
+                          ? (day.distance / day.activities / 1000).toFixed(2)
+                          : '0.00'}{' '}
+                        km
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
