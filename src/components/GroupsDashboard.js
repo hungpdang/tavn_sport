@@ -8,16 +8,55 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  ScatterChart,
-  Scatter,
-  LineChart,
-  Line,
 } from 'recharts';
+
+// Utility function to parse the new date format
+const parseDateField = (dateString) => {
+  if (!dateString) return null;
+
+  // Clean up the date string by removing newlines and extra spaces
+  const cleanDateString = dateString.replace(/\n\s+/g, ' ').trim();
+
+  try {
+    // Handle the specific format: "Mon, 08 Sep, 2025 - 12:56:34"
+    // Convert to a more standard format that Date can parse
+    let dateToParse = cleanDateString;
+
+    // If it contains the format "Mon, 08 Sep, 2025 - 12:56:34"
+    if (dateToParse.includes(' - ')) {
+      // Replace " - " with " " to make it "Mon, 08 Sep, 2025 12:56:34"
+      dateToParse = dateToParse.replace(' - ', ' ');
+    }
+
+    const date = new Date(dateToParse);
+
+    // Check if the date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date parsed:', dateString, '->', dateToParse);
+      return null;
+    }
+
+    // Extract day and month in MM/DD format
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return {
+      dayMonth: `${month}${day}`, // Keep original format for compatibility
+      formattedDate: `${month}/${day}`,
+      fullDate: date,
+    };
+  } catch (error) {
+    console.warn('Failed to parse date:', dateString, error);
+    return null;
+  }
+};
 
 const GroupsDashboard = () => {
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [availableDays, setAvailableDays] = useState([]);
 
   const API_ENDPOINT = 'https://apptavn-ynfcnag4xa-uc.a.run.app/activities';
 
@@ -32,7 +71,14 @@ const GroupsDashboard = () => {
         // Process activities to extract team data
         const teamData = response.data.reduce((acc, activity) => {
           const teamName = activity.athlete?.team || 'No Team';
-          const dayMonth = activity.daymonth || 'Unknown';
+          // Use the new date field (date, date_committed, or date_fetch) with fallback to old daymonth
+          const dateField =
+            activity.date ||
+            activity.date_committed ||
+            activity.date_fetch ||
+            activity.daymonth;
+          const parsedDate = parseDateField(dateField);
+          const dayMonth = parsedDate?.dayMonth || 'Unknown';
 
           if (!acc[teamName]) {
             acc[teamName] = {
@@ -57,6 +103,7 @@ const GroupsDashboard = () => {
               activities: 0,
               distance: 0,
               members: new Set(),
+              formattedDate: parsedDate?.formattedDate || 'Unknown',
             };
           }
           acc[teamName].dailyActivities[dayMonth].activities += 1;
@@ -78,6 +125,23 @@ const GroupsDashboard = () => {
         }));
 
         setTeams(formattedTeams);
+
+        // Extract all available days and set current day as default
+        const allDays = new Set();
+        Object.values(teamData).forEach((team) => {
+          Object.keys(team.dailyActivities).forEach((day) => {
+            allDays.add(day);
+          });
+        });
+
+        const sortedDays = Array.from(allDays).sort().reverse(); // Most recent first
+        setAvailableDays(sortedDays);
+
+        // Set current day as default (most recent day with data)
+        if (sortedDays.length > 0) {
+          setSelectedDay(sortedDays[0]);
+        }
+
         setLoading(false);
       } catch (err) {
         console.error('Error fetching teams:', err);
@@ -116,22 +180,6 @@ const GroupsDashboard = () => {
     distance: team.totalDistanceKm,
   }));
 
-  const scatterData = teams.map((team) => ({
-    x: team.members,
-    y: team.activities,
-    name: team.name,
-  }));
-
-  const statusData = teams.reduce((acc, team) => {
-    acc[team.status] = (acc[team.status] || 0) + 1;
-    return acc;
-  }, {});
-
-  const statusChartData = Object.entries(statusData).map(([status, count]) => ({
-    status,
-    count,
-  }));
-
   if (loading) {
     return (
       <div className="loading">
@@ -145,8 +193,8 @@ const GroupsDashboard = () => {
   }
 
   return (
-    <div>
-      <div className="stats-grid">
+    <div style={{ padding: '0 1rem' }}>
+      <div className="stats-grid" style={{ marginBottom: '2rem' }}>
         <div className="stat-card">
           <div className="stat-value">{teamStats.totalTeams}</div>
           <div className="stat-label">Total Teams</div>
@@ -167,48 +215,7 @@ const GroupsDashboard = () => {
         </div>
       </div>
 
-      <div className="dashboard-grid">
-        <div className="chart-container">
-          <h3 className="chart-title">Team Size vs Activities</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <ScatterChart data={scatterData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="x" name="Members" />
-              <YAxis dataKey="y" name="Activities" />
-              <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-              <Scatter dataKey="y" fill="#667eea" />
-            </ScatterChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="chart-container">
-          <h3 className="chart-title">Team Status Distribution</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={statusChartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="status" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="count" fill="#00C49F" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      <div className="dashboard-grid">
-        <div className="chart-container">
-          <h3 className="chart-title">Members per Team</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="members" fill="#FFBB28" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
+      <div className="dashboard-grid" style={{ marginBottom: '2rem' }}>
         <div className="chart-container">
           <h3 className="chart-title">Distance per Team</h3>
           <ResponsiveContainer width="100%" height={300}>
@@ -224,8 +231,7 @@ const GroupsDashboard = () => {
           </ResponsiveContainer>
         </div>
       </div>
-
-      <div className="dashboard-card">
+      <div className="dashboard-card" style={{ marginBottom: '2rem' }}>
         <div className="card-header">
           <h3 className="card-title">Teams Table</h3>
           <span className="card-subtitle">All teams and their details</span>
@@ -234,11 +240,17 @@ const GroupsDashboard = () => {
           <thead>
             <tr>
               <th>Team Name</th>
-              <th>Members</th>
-              <th>Activities</th>
+              <th title="Number of members in this team">Members</th>
+              <th title="Total number of activities completed by this team">
+                Activities
+              </th>
               <th>Total Distance (km)</th>
-              <th>Status</th>
-              <th>Activity Rate</th>
+              <th title="Team activity status - All teams are currently marked as Active">
+                Status
+              </th>
+              <th title="Average distance per team member in kilometers - calculated as total team distance divided by number of members">
+                Distance Rate
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -273,16 +285,17 @@ const GroupsDashboard = () => {
                       fontSize: '0.75rem',
                       fontWeight: '500',
                       backgroundColor:
-                        team.activities / team.members > 0.5
+                        team.totalDistance / team.members > 1000
                           ? '#e6fffa'
                           : '#fef5e7',
                       color:
-                        team.activities / team.members > 0.5
+                        team.totalDistance / team.members > 1000
                           ? '#00a085'
                           : '#d69e2e',
                     }}
                   >
-                    {(team.activities / team.members).toFixed(1)}/member
+                    {(team.totalDistance / team.members / 1000).toFixed(1)}
+                    km/member
                   </span>
                 </td>
               </tr>
@@ -290,132 +303,148 @@ const GroupsDashboard = () => {
           </tbody>
         </table>
       </div>
-
       <div className="dashboard-card">
         <div className="card-header">
           <h3 className="card-title">Daily Team Activity</h3>
           <span className="card-subtitle">
-            Team activities organized by day
+            Team activities for selected day
           </span>
         </div>
-        {teams.map((team) => {
-          const dailyData = Object.values(team.dailyActivities || {})
-            .sort((a, b) => b.distance - a.distance)
-            .map((day) => ({
-              ...day,
-              formattedDate: day.dayMonth
-                ? `${day.dayMonth.substring(2, 4)}/${day.dayMonth.substring(
-                    0,
-                    2
-                  )}`
-                : 'Unknown',
-              distanceKm: (day.distance / 1000).toFixed(2),
-              memberCount: day.members ? day.members.size : 0,
-            }));
 
-          if (dailyData.length === 0) return null;
+        {availableDays.length > 0 && (
+          <div
+            style={{
+              marginBottom: '1rem',
+              padding: '1rem',
+              backgroundColor: '#f8fafc',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0',
+            }}
+          >
+            <label
+              style={{
+                display: 'block',
+                marginBottom: '0.5rem',
+                fontWeight: '600',
+                color: '#2d3748',
+              }}
+            >
+              Select Day:
+            </label>
+            <select
+              value={selectedDay || ''}
+              onChange={(e) => setSelectedDay(e.target.value)}
+              style={{
+                padding: '0.5rem',
+                borderRadius: '6px',
+                border: '1px solid #d1d5db',
+                backgroundColor: 'white',
+                fontSize: '0.875rem',
+                minWidth: '200px',
+              }}
+            >
+              {availableDays.map((day) => {
+                const team = teams.find(
+                  (t) => t.dailyActivities && t.dailyActivities[day]
+                );
+                const formattedDate =
+                  team?.dailyActivities[day]?.formattedDate || day;
+                return (
+                  <option key={day} value={day}>
+                    {formattedDate}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        )}
 
-          return (
-            <div key={team.name} style={{ marginBottom: '2rem' }}>
+        {selectedDay && (
+          <div>
+            <h4
+              style={{
+                marginBottom: '1rem',
+                color: '#2d3748',
+                fontSize: '1.25rem',
+                fontWeight: '600',
+              }}
+            >
+              Teams Active on{' '}
+              {teams.find(
+                (t) => t.dailyActivities && t.dailyActivities[selectedDay]
+              )?.dailyActivities[selectedDay]?.formattedDate || selectedDay}
+            </h4>
+
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Team Name</th>
+                  <th title="Number of activities completed by the team on the selected day">
+                    Activities
+                  </th>
+                  <th title="Total distance covered by the team on the selected day">
+                    Distance (km)
+                  </th>
+                  <th title="Number of unique team members who were active on the selected day">
+                    Active Members
+                  </th>
+                  <th title="Average distance per activity for the team on the selected day">
+                    Avg Distance (km)
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {teams
+                  .filter(
+                    (team) =>
+                      team.dailyActivities && team.dailyActivities[selectedDay]
+                  )
+                  .map((team) => {
+                    const dayData = team.dailyActivities[selectedDay];
+                    const memberCount = dayData.members
+                      ? dayData.members.size
+                      : 0;
+                    const distanceKm = (dayData.distance / 1000).toFixed(2);
+                    const avgDistance =
+                      dayData.activities > 0
+                        ? (
+                            dayData.distance /
+                            dayData.activities /
+                            1000
+                          ).toFixed(2)
+                        : '0.00';
+
+                    return (
+                      <tr key={team.name}>
+                        <td style={{ fontWeight: '600' }}>{team.name}</td>
+                        <td>{dayData.activities}</td>
+                        <td style={{ fontWeight: '600', color: '#2d3748' }}>
+                          {distanceKm} km
+                        </td>
+                        <td>{memberCount}</td>
+                        <td>{avgDistance} km</td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+
+            {teams.filter(
+              (team) =>
+                team.dailyActivities && team.dailyActivities[selectedDay]
+            ).length === 0 && (
               <div
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '1rem',
-                  padding: '1rem',
-                  backgroundColor: '#f8fafc',
-                  borderRadius: '8px',
-                  border: '1px solid #e2e8f0',
+                  textAlign: 'center',
+                  padding: '2rem',
+                  color: '#718096',
                 }}
               >
-                <h4
-                  style={{
-                    margin: 0,
-                    color: '#2d3748',
-                    fontSize: '1.25rem',
-                    fontWeight: '600',
-                  }}
-                >
-                  {team.name} - Daily Activities
-                </h4>
-                <div style={{ display: 'flex', gap: '2rem' }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <div
-                      style={{
-                        fontSize: '1.5rem',
-                        fontWeight: '700',
-                        color: '#667eea',
-                      }}
-                    >
-                      {dailyData.length}
-                    </div>
-                    <div style={{ fontSize: '0.875rem', color: '#718096' }}>
-                      Active Days
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div
-                      style={{
-                        fontSize: '1.5rem',
-                        fontWeight: '700',
-                        color: '#00C49F',
-                      }}
-                    >
-                      {team.activities}
-                    </div>
-                    <div style={{ fontSize: '0.875rem', color: '#718096' }}>
-                      Total Activities
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div
-                      style={{
-                        fontSize: '1.5rem',
-                        fontWeight: '700',
-                        color: '#FFBB28',
-                      }}
-                    >
-                      {team.totalDistanceKm.toFixed(2)}km
-                    </div>
-                    <div style={{ fontSize: '0.875rem', color: '#718096' }}>
-                      Total Distance
-                    </div>
-                  </div>
-                </div>
+                No team activities found for the selected day.
               </div>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Activities</th>
-                    <th>Distance (km)</th>
-                    <th>Active Members</th>
-                    <th>Avg Distance (km)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dailyData.map((day) => (
-                    <tr key={day.dayMonth}>
-                      <td style={{ fontWeight: '600' }}>{day.formattedDate}</td>
-                      <td>{day.activities}</td>
-                      <td style={{ fontWeight: '600', color: '#2d3748' }}>
-                        {day.distanceKm} km
-                      </td>
-                      <td>{day.memberCount}</td>
-                      <td>
-                        {day.activities > 0
-                          ? (day.distance / day.activities / 1000).toFixed(2)
-                          : '0.00'}{' '}
-                        km
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          );
-        })}
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

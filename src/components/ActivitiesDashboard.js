@@ -8,12 +8,48 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
 } from 'recharts';
+
+// Utility function to parse the new date format
+const parseDateField = (dateString) => {
+  if (!dateString) return null;
+
+  // Clean up the date string by removing newlines and extra spaces
+  const cleanDateString = dateString.replace(/\n\s+/g, ' ').trim();
+
+  try {
+    // Handle the specific format: "Mon, 08 Sep, 2025 - 12:56:34"
+    // Convert to a more standard format that Date can parse
+    let dateToParse = cleanDateString;
+
+    // If it contains the format "Mon, 08 Sep, 2025 - 12:56:34"
+    if (dateToParse.includes(' - ')) {
+      // Replace " - " with " " to make it "Mon, 08 Sep, 2025 12:56:34"
+      dateToParse = dateToParse.replace(' - ', ' ');
+    }
+
+    const date = new Date(dateToParse);
+
+    // Check if the date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date parsed:', dateString, '->', dateToParse);
+      return null;
+    }
+
+    // Extract day and month in MM/DD format
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return {
+      dayMonth: `${month}${day}`, // Keep original format for compatibility
+      formattedDate: `${month}/${day}`,
+      fullDate: date,
+    };
+  } catch (error) {
+    console.warn('Failed to parse date:', dateString, error);
+    return null;
+  }
+};
 
 const ActivitiesDashboard = () => {
   const [activities, setActivities] = useState([]);
@@ -21,7 +57,6 @@ const ActivitiesDashboard = () => {
   const [error, setError] = useState(null);
 
   const API_ENDPOINT = 'https://apptavn-ynfcnag4xa-uc.a.run.app/activities';
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
   useEffect(() => {
     const fetchActivities = async () => {
@@ -62,7 +97,15 @@ const ActivitiesDashboard = () => {
 
   // Process data for daily activity records
   const dailyActivities = activities.reduce((acc, activity) => {
-    const dayMonth = activity.daymonth || 'Unknown';
+    // Use the new date field (date, date_committed, or date_fetch) with fallback to old daymonth
+    const dateField =
+      activity.date ||
+      activity.date_committed ||
+      activity.date_fetch ||
+      activity.daymonth;
+    const parsedDate = parseDateField(dateField);
+    const dayMonth = parsedDate?.dayMonth || 'Unknown';
+
     if (!acc[dayMonth]) {
       acc[dayMonth] = {
         dayMonth,
@@ -72,6 +115,7 @@ const ActivitiesDashboard = () => {
         athletes: new Set(),
         teamCount: 0,
         teams: new Set(),
+        formattedDate: parsedDate?.formattedDate || 'Unknown',
       };
     }
     acc[dayMonth].activities.push(activity);
@@ -144,18 +188,7 @@ const ActivitiesDashboard = () => {
       ),
     }));
 
-  // Sort daily activities by total distance (descending)
-  const dailyLeaderboardData = Object.values(dailyActivities)
-    .sort((a, b) => b.totalDistance - a.totalDistance)
-    .map((day, index) => ({
-      ...day,
-      rank: index + 1,
-      totalDistanceKm: Math.round((day.totalDistance / 1000) * 100) / 100,
-      averageDistance: Math.round(day.totalDistance / day.activities.length),
-      formattedDate: day.dayMonth
-        ? `${day.dayMonth.substring(2, 4)}/${day.dayMonth.substring(0, 2)}`
-        : 'Unknown',
-    }));
+  // Note: dailyLeaderboardData was removed as it's no longer used in the UI
 
   // Calculate statistics based on actual API data
   const totalActivities = activities.length;
@@ -165,10 +198,6 @@ const ActivitiesDashboard = () => {
   );
   const totalAthletes = Object.keys(athleteDistances).length;
   const totalTeams = Object.keys(teamDistances).length;
-  const averageDistancePerAthlete =
-    totalAthletes > 0
-      ? Math.round((totalDistance / totalAthletes / 1000) * 100) / 100
-      : 0;
 
   if (loading) {
     return (
@@ -183,8 +212,8 @@ const ActivitiesDashboard = () => {
   }
 
   return (
-    <div>
-      <div className="stats-grid">
+    <div style={{ padding: '0 1rem' }}>
+      <div className="stats-grid" style={{ marginBottom: '2rem' }}>
         <div className="stat-card">
           <div className="stat-value">{totalTeams}</div>
           <div className="stat-label">Total Teams</div>
@@ -205,7 +234,72 @@ const ActivitiesDashboard = () => {
         </div>
       </div>
 
-      <div className="dashboard-grid">
+      <div className="dashboard-card" style={{ marginBottom: '2rem' }}>
+        <div className="card-header">
+          <h3 className="card-title">Team Distance Leaderboard</h3>
+          <span className="card-subtitle">
+            Teams ranked by total distance covered
+          </span>
+        </div>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th title="Team ranking based on total distance covered (1st, 2nd, 3rd place highlighted)">
+                Rank
+              </th>
+              <th>Team</th>
+              <th>Total Distance (km)</th>
+              <th title="Total number of activities completed by this team">
+                Activities
+              </th>
+              <th title="Number of athletes in this team">Athletes</th>
+              <th title="Average distance per athlete in the team">
+                Avg Distance/Athlete (km)
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {teamLeaderboardData.map((team) => (
+              <tr key={team.name}>
+                <td>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      backgroundColor:
+                        team.rank === 1
+                          ? '#FFD700'
+                          : team.rank === 2
+                          ? '#C0C0C0'
+                          : team.rank === 3
+                          ? '#CD7F32'
+                          : '#f0f4ff',
+                      color: team.rank <= 3 ? 'white' : '#667eea',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                    }}
+                  >
+                    {team.rank}
+                  </span>
+                </td>
+                <td style={{ fontWeight: '600' }}>{team.name}</td>
+                <td style={{ fontWeight: '600', color: '#2d3748' }}>
+                  {team.totalDistanceKm.toFixed(2)} km
+                </td>
+                <td>{team.activityCount}</td>
+                <td>{team.athleteCount}</td>
+                <td>{(team.averageDistancePerAthlete / 1000).toFixed(2)} km</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="dashboard-grid" style={{ marginBottom: '2rem' }}>
         <div className="chart-container">
           <h3 className="chart-title">Total Distance by Athlete</h3>
           <ResponsiveContainer width="100%" height={400}>
@@ -255,37 +349,6 @@ const ActivitiesDashboard = () => {
         </div>
       </div>
 
-      <div className="chart-container">
-        <h3 className="chart-title">Daily Activity Trends</h3>
-        <ResponsiveContainer width="100%" height={400}>
-          <BarChart
-            data={dailyLeaderboardData.map((day) => ({
-              date: day.formattedDate,
-              distance: day.totalDistanceKm,
-              activities: day.activities.length,
-              athletes: day.athleteCount,
-            }))}
-          >
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
-            <YAxis />
-            <Tooltip
-              formatter={(value, name) => [
-                name === 'distance' ? `${value} km` : value,
-                name === 'distance'
-                  ? 'Total Distance'
-                  : name === 'activities'
-                  ? 'Activities'
-                  : 'Athletes',
-              ]}
-            />
-            <Bar dataKey="distance" fill="#667eea" name="Total Distance" />
-            <Bar dataKey="activities" fill="#00C49F" name="Activities" />
-            <Bar dataKey="athletes" fill="#FFBB28" name="Athletes" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
       <div className="dashboard-card">
         <div className="card-header">
           <h3 className="card-title">Distance Leaderboard</h3>
@@ -296,13 +359,21 @@ const ActivitiesDashboard = () => {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Rank</th>
+              <th title="Athlete ranking based on total distance covered (1st, 2nd, 3rd place highlighted)">
+                Rank
+              </th>
               <th>Athlete</th>
               <th>Team</th>
               <th>Total Distance (km)</th>
-              <th>Activities</th>
-              <th>Avg Distance (km)</th>
-              <th>Best Activity</th>
+              <th title="Total number of activities completed by this athlete">
+                Activities
+              </th>
+              <th title="Average distance per activity for this athlete">
+                Avg Distance (km)
+              </th>
+              <th title="Distance of the athlete's longest single activity">
+                Best Activity
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -374,126 +445,6 @@ const ActivitiesDashboard = () => {
                 </tr>
               );
             })}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="dashboard-card">
-        <div className="card-header">
-          <h3 className="card-title">Team Distance Leaderboard</h3>
-          <span className="card-subtitle">
-            Teams ranked by total distance covered
-          </span>
-        </div>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Rank</th>
-              <th>Team</th>
-              <th>Total Distance (km)</th>
-              <th>Activities</th>
-              <th>Athletes</th>
-              <th>Avg Distance/Athlete (km)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {teamLeaderboardData.map((team) => (
-              <tr key={team.name}>
-                <td>
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '50%',
-                      backgroundColor:
-                        team.rank === 1
-                          ? '#FFD700'
-                          : team.rank === 2
-                          ? '#C0C0C0'
-                          : team.rank === 3
-                          ? '#CD7F32'
-                          : '#f0f4ff',
-                      color: team.rank <= 3 ? 'white' : '#667eea',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                    }}
-                  >
-                    {team.rank}
-                  </span>
-                </td>
-                <td style={{ fontWeight: '600' }}>{team.name}</td>
-                <td style={{ fontWeight: '600', color: '#2d3748' }}>
-                  {team.totalDistanceKm.toFixed(2)} km
-                </td>
-                <td>{team.activityCount}</td>
-                <td>{team.athleteCount}</td>
-                <td>{(team.averageDistancePerAthlete / 1000).toFixed(2)} km</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="dashboard-card">
-        <div className="card-header">
-          <h3 className="card-title">Daily Activity Records</h3>
-          <span className="card-subtitle">
-            Activities organized by day with daily statistics
-          </span>
-        </div>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Rank</th>
-              <th>Date</th>
-              <th>Total Distance (km)</th>
-              <th>Activities</th>
-              <th>Athletes</th>
-              <th>Teams</th>
-              <th>Avg Distance (km)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {dailyLeaderboardData.map((day) => (
-              <tr key={day.dayMonth}>
-                <td>
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '50%',
-                      backgroundColor:
-                        day.rank === 1
-                          ? '#FFD700'
-                          : day.rank === 2
-                          ? '#C0C0C0'
-                          : day.rank === 3
-                          ? '#CD7F32'
-                          : '#f0f4ff',
-                      color: day.rank <= 3 ? 'white' : '#667eea',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                    }}
-                  >
-                    {day.rank}
-                  </span>
-                </td>
-                <td style={{ fontWeight: '600' }}>{day.formattedDate}</td>
-                <td style={{ fontWeight: '600', color: '#2d3748' }}>
-                  {day.totalDistanceKm.toFixed(2)} km
-                </td>
-                <td>{day.activities.length}</td>
-                <td>{day.athleteCount}</td>
-                <td>{day.teamCount}</td>
-                <td>{(day.averageDistance / 1000).toFixed(2)} km</td>
-              </tr>
-            ))}
           </tbody>
         </table>
       </div>

@@ -23,25 +23,25 @@ function App() {
   return (
     <div className="App">
       <header className="app-header">
-        <h1>TAVN Sport Dashboard</h1>
+        <h1>Walking Challenge Dashboard</h1>
         <nav className="nav-tabs">
           <button
             className={`nav-tab ${activeTab === 'activities' ? 'active' : ''}`}
             onClick={() => setActiveTab('activities')}
           >
-            Activities
+            Overall
           </button>
           <button
             className={`nav-tab ${activeTab === 'groups' ? 'active' : ''}`}
             onClick={() => setActiveTab('groups')}
           >
-            Groups
+            Teams
           </button>
           <button
             className={`nav-tab ${activeTab === 'members' ? 'active' : ''}`}
             onClick={() => setActiveTab('members')}
           >
-            Members
+            Individuals
           </button>
         </nav>
       </header>
