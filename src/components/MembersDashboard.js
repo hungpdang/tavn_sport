@@ -10,136 +10,80 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-// Utility function to parse the new date format
-const parseDateField = (dateString) => {
-  if (!dateString) return null;
-
-  // Clean up the date string by removing newlines and extra spaces
-  const cleanDateString = dateString.replace(/\n\s+/g, ' ').trim();
-
-  try {
-    // Handle the specific format: "Mon, 08 Sep, 2025 - 12:56:34"
-    // Convert to a more standard format that Date can parse
-    let dateToParse = cleanDateString;
-
-    // If it contains the format "Mon, 08 Sep, 2025 - 12:56:34"
-    if (dateToParse.includes(' - ')) {
-      // Replace " - " with " " to make it "Mon, 08 Sep, 2025 12:56:34"
-      dateToParse = dateToParse.replace(' - ', ' ');
-    }
-
-    const date = new Date(dateToParse);
-
-    // Check if the date is valid
-    if (isNaN(date.getTime())) {
-      console.warn('Invalid date parsed:', dateString, '->', dateToParse);
-      return null;
-    }
-
-    // Extract day and month in MM/DD format
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-
-    return {
-      dayMonth: `${month}${day}`, // Keep original format for compatibility
-      formattedDate: `${month}/${day}`,
-      fullDate: date,
-    };
-  } catch (error) {
-    console.warn('Failed to parse date:', dateString, error);
-    return null;
-  }
-};
-
 const MembersDashboard = () => {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const API_ENDPOINT = 'https://apptavn-ynfcnag4xa-uc.a.run.app/activities';
+  const API_ENDPOINT = 'https://apptavn-ynfcnag4xa-uc.a.run.app/members';
 
   useEffect(() => {
     const fetchMembers = async () => {
       try {
         setLoading(true);
-        console.log('Fetching activities from:', API_ENDPOINT);
-        const response = await axios.get(API_ENDPOINT);
-        console.log('API Response:', response.data);
+        console.log('Fetching members from:', API_ENDPOINT);
+        const membersResponse = await axios.get(API_ENDPOINT);
+        console.log('Members API Response:', membersResponse.data);
 
-        // Process activities to extract member data
-        if (!response.data || !Array.isArray(response.data)) {
-          throw new Error('Invalid API response format');
+        // Also fetch activities to get activity data for each member
+        const activitiesResponse = await axios.get(
+          'https://apptavn-ynfcnag4xa-uc.a.run.app/activities'
+        );
+        console.log('Activities API Response:', activitiesResponse.data);
+
+        // Process member data directly from the members API
+        if (!membersResponse.data || !Array.isArray(membersResponse.data)) {
+          throw new Error('Invalid members API response format');
         }
 
-        const memberData = response.data.reduce((acc, activity) => {
-          // Add safety checks for activity structure
-          if (!activity || !activity.athlete) {
-            console.warn(
-              'Skipping activity with missing athlete data:',
-              activity
-            );
-            return acc;
-          }
+        // Process activities to get member activity data
+        const memberActivityData = {};
+        if (activitiesResponse.data && Array.isArray(activitiesResponse.data)) {
+          activitiesResponse.data.forEach((activity) => {
+            if (activity.athlete) {
+              const memberName =
+                `${activity.athlete?.firstname} ${activity.athlete?.lastname}`.trim();
+              if (!memberActivityData[memberName]) {
+                memberActivityData[memberName] = {
+                  activities: 0,
+                  totalDistance: 0,
+                };
+              }
+              memberActivityData[memberName].activities += 1;
+              memberActivityData[memberName].totalDistance +=
+                activity.distance || 0;
+            }
+          });
+        }
 
-          const memberName = `${activity.athlete?.firstname} ${activity.athlete?.lastname}`;
-          const teamName = activity.athlete?.team || 'No Team';
-          // Use the new date field (date, date_committed, or date_fetch) with fallback to old daymonth
-          const dateField =
-            activity.date ||
-            activity.date_committed ||
-            activity.date_fetch ||
-            activity.daymonth;
-          const parsedDate = parseDateField(dateField);
-          const dayMonth = parsedDate?.dayMonth || 'Unknown';
+        // Format members data with activity data merged in
+        const formattedMembers = membersResponse.data.map((member, index) => {
+          const memberName =
+            member.webName ||
+            `${member.firstname} ${member.lastname}`.trim() ||
+            'Unknown Member';
+          const activityData = memberActivityData[memberName] || {
+            activities: 0,
+            totalDistance: 0,
+          };
 
-          if (!acc[memberName]) {
-            acc[memberName] = {
-              name: memberName,
-              team: teamName,
-              activities: 0,
-              totalDistance: 0,
-              activitiesList: [],
-              dailyActivities: {},
-            };
-          }
-          acc[memberName].activities += 1;
-          acc[memberName].totalDistance += activity.distance || 0;
-          acc[memberName].activitiesList.push(activity);
-
-          // Track daily activities
-          if (!acc[memberName].dailyActivities[dayMonth]) {
-            acc[memberName].dailyActivities[dayMonth] = {
-              dayMonth,
-              activities: 0,
-              distance: 0,
-              formattedDate: parsedDate?.formattedDate || 'Unknown',
-            };
-          }
-          acc[memberName].dailyActivities[dayMonth].activities += 1;
-          acc[memberName].dailyActivities[dayMonth].distance +=
-            activity.distance || 0;
-
-          return acc;
-        }, {});
-
-        console.log('Processed member data:', memberData);
-
-        // Convert to array and add calculated fields
-        const formattedMembers = Object.values(memberData).map(
-          (member, index) => ({
+          return {
             id: index + 1,
-            name: member.name,
-            team: member.team,
-            activities: member.activities,
+            name: memberName,
+            team: member.team || 'No Team',
+            activities: activityData.activities,
             totalDistance:
-              Math.round((member.totalDistance / 1000) * 100) / 100,
-            averageDistance: Math.round(
-              member.totalDistance / member.activities
-            ),
+              Math.round((activityData.totalDistance / 1000) * 100) / 100,
+            averageDistance:
+              activityData.activities > 0
+                ? Math.round(
+                    activityData.totalDistance / activityData.activities
+                  )
+                : 0,
             status: 'Active', // All members are considered active
             joinDate: '2024-01-01', // Default date since not available in API
-          })
-        );
+          };
+        });
 
         console.log('Formatted members:', formattedMembers);
 
@@ -219,25 +163,6 @@ const MembersDashboard = () => {
 
   return (
     <div style={{ padding: '0 1rem' }}>
-      <div className="stats-grid" style={{ marginBottom: '2rem' }}>
-        <div className="stat-card">
-          <div className="stat-value">{memberStats.totalMembers}</div>
-          <div className="stat-label">Total Members</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{memberStats.activeMembers}</div>
-          <div className="stat-label">Active Members</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{averageActivities}</div>
-          <div className="stat-label">Avg Activities/Member</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{averageDistance.toFixed(2)}km</div>
-          <div className="stat-label">Avg Distance/Member</div>
-        </div>
-      </div>
-
       <div className="dashboard-grid" style={{ marginBottom: '2rem' }}>
         <div className="chart-container">
           <h3 className="chart-title">Top Active Members</h3>

@@ -64,12 +64,36 @@ const GroupsDashboard = () => {
     const fetchTeams = async () => {
       try {
         setLoading(true);
-        console.log('Fetching activities from:', API_ENDPOINT);
-        const response = await axios.get(API_ENDPOINT);
-        console.log('API Response:', response.data);
+        console.log('Fetching data from APIs...');
+
+        // Fetch both members and activities data
+        const [membersResponse, activitiesResponse] = await Promise.all([
+          axios.get('https://apptavn-ynfcnag4xa-uc.a.run.app/members'),
+          axios.get(API_ENDPOINT),
+        ]);
+
+        console.log('Members API Response:', membersResponse.data);
+        console.log('Activities API Response:', activitiesResponse.data);
+
+        // Process members data to get team structure
+        const teamMembers = {};
+        if (membersResponse.data && Array.isArray(membersResponse.data)) {
+          membersResponse.data.forEach((member) => {
+            const teamName = member.team || 'No Team';
+            const memberName =
+              member.webName ||
+              `${member.firstname} ${member.lastname}`.trim() ||
+              'Unknown Member';
+
+            if (!teamMembers[teamName]) {
+              teamMembers[teamName] = new Set();
+            }
+            teamMembers[teamName].add(memberName);
+          });
+        }
 
         // Process activities to extract team data
-        const teamData = response.data.reduce((acc, activity) => {
+        const teamData = activitiesResponse.data.reduce((acc, activity) => {
           const teamName = activity.athlete?.team || 'No Team';
           // Use the new date field (date, date_committed, or date_fetch) with fallback to old daymonth
           const dateField =
@@ -83,16 +107,13 @@ const GroupsDashboard = () => {
           if (!acc[teamName]) {
             acc[teamName] = {
               name: teamName,
-              members: new Set(),
+              members: teamMembers[teamName] || new Set(),
               activities: 0,
               totalDistance: 0,
               status: 'Active', // All teams are considered active
               dailyActivities: {},
             };
           }
-          acc[teamName].members.add(
-            `${activity.athlete?.firstname} ${activity.athlete?.lastname}`
-          );
           acc[teamName].activities += 1;
           acc[teamName].totalDistance += activity.distance || 0;
 
@@ -194,27 +215,6 @@ const GroupsDashboard = () => {
 
   return (
     <div style={{ padding: '0 1rem' }}>
-      <div className="stats-grid" style={{ marginBottom: '2rem' }}>
-        <div className="stat-card">
-          <div className="stat-value">{teamStats.totalTeams}</div>
-          <div className="stat-label">Total Teams</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{teamStats.activeTeams}</div>
-          <div className="stat-label">Active Teams</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{teamStats.totalMembers}</div>
-          <div className="stat-label">Total Members</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">
-            {(teamStats.totalDistance / 1000).toFixed(2)}km
-          </div>
-          <div className="stat-label">Total Distance</div>
-        </div>
-      </div>
-
       <div className="dashboard-grid" style={{ marginBottom: '2rem' }}>
         <div className="chart-container">
           <h3 className="chart-title">Distance per Team</h3>
