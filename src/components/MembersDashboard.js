@@ -41,17 +41,26 @@ const MembersDashboard = () => {
         if (activitiesResponse.data && Array.isArray(activitiesResponse.data)) {
           activitiesResponse.data.forEach((activity) => {
             if (activity.athlete) {
-              const memberName =
-                `${activity.athlete?.firstname} ${activity.athlete?.lastname}`.trim();
-              if (!memberActivityData[memberName]) {
-                memberActivityData[memberName] = {
-                  activities: 0,
-                  totalDistance: 0,
-                };
-              }
-              memberActivityData[memberName].activities += 1;
-              memberActivityData[memberName].totalDistance +=
-                activity.distance || 0;
+              // Create multiple possible name formats for matching
+              const firstName = activity.athlete?.firstname || '';
+              const lastName = activity.athlete?.lastname || '';
+              const fullName = `${firstName} ${lastName}`.trim();
+              const webName = activity.athlete?.webName || '';
+
+              // Try to match with different name formats
+              const possibleNames = [fullName, webName].filter((name) => name);
+
+              possibleNames.forEach((name) => {
+                if (!memberActivityData[name]) {
+                  memberActivityData[name] = {
+                    activities: 0,
+                    totalDistance: 0,
+                  };
+                }
+                memberActivityData[name].activities += 1;
+                memberActivityData[name].totalDistance +=
+                  activity.distance || 0;
+              });
             }
           });
         }
@@ -62,10 +71,24 @@ const MembersDashboard = () => {
             member.webName ||
             `${member.firstname} ${member.lastname}`.trim() ||
             'Unknown Member';
-          const activityData = memberActivityData[memberName] || {
-            activities: 0,
-            totalDistance: 0,
-          };
+
+          // Try to find activity data by matching different name formats
+          const possibleNames = [
+            memberName,
+            member.webName,
+            `${member.firstname} ${member.lastname}`.trim(),
+            `${member.lastname} ${member.firstname}`.trim(), // Try reverse order
+          ].filter((name) => name);
+
+          let activityData = { activities: 0, totalDistance: 0 };
+
+          // Find the first matching name in activity data
+          for (const name of possibleNames) {
+            if (memberActivityData[name]) {
+              activityData = memberActivityData[name];
+              break;
+            }
+          }
 
           return {
             id: index + 1,
@@ -85,6 +108,7 @@ const MembersDashboard = () => {
           };
         });
 
+        console.log('Member activity data:', memberActivityData);
         console.log('Formatted members:', formattedMembers);
 
         setMembers(formattedMembers);
