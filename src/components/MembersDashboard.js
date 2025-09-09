@@ -10,6 +10,47 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
+// Utility function to parse the new date format
+const parseDateField = (dateString) => {
+  if (!dateString) return null;
+
+  // Clean up the date string by removing newlines and extra spaces
+  const cleanDateString = dateString.replace(/\n\s+/g, ' ').trim();
+
+  try {
+    // Handle the specific format: "Mon, 08 Sep, 2025 - 12:56:34"
+    // Convert to a more standard format that Date can parse
+    let dateToParse = cleanDateString;
+
+    // If it contains the format "Mon, 08 Sep, 2025 - 12:56:34"
+    if (dateToParse.includes(' - ')) {
+      // Replace " - " with " " to make it "Mon, 08 Sep, 2025 12:56:34"
+      dateToParse = dateToParse.replace(' - ', ' ');
+    }
+
+    const date = new Date(dateToParse);
+
+    // Check if the date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date parsed:', dateString, '->', dateToParse);
+      return null;
+    }
+
+    // Extract day and month in MM/DD format
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return {
+      dayMonth: `${month}${day}`, // Keep original format for compatibility
+      formattedDate: `${month}/${day}`,
+      fullDate: date,
+    };
+  } catch (error) {
+    console.warn('Failed to parse date:', dateString, error);
+    return null;
+  }
+};
+
 const MembersDashboard = () => {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -65,6 +106,38 @@ const MembersDashboard = () => {
           });
         }
 
+        // Calculate total days with activities for each member
+        const memberDailyActivities = {};
+        if (activitiesResponse.data && Array.isArray(activitiesResponse.data)) {
+          activitiesResponse.data.forEach((activity) => {
+            if (activity.athlete) {
+              const firstName = activity.athlete?.firstname || '';
+              const lastName = activity.athlete?.lastname || '';
+              const fullName = `${firstName} ${lastName}`.trim();
+              const webName = activity.athlete?.webName || '';
+
+              const possibleNames = [fullName, webName].filter((name) => name);
+
+              possibleNames.forEach((name) => {
+                if (!memberDailyActivities[name]) {
+                  memberDailyActivities[name] = new Set();
+                }
+
+                // Use the new date field (date, date_committed, or date_fetch) with fallback to old daymonth
+                const dateField =
+                  activity.date ||
+                  activity.date_committed ||
+                  activity.date_fetch ||
+                  activity.daymonth;
+                const parsedDate = parseDateField(dateField);
+                const dayMonth = parsedDate?.dayMonth || 'Unknown';
+
+                memberDailyActivities[name].add(dayMonth);
+              });
+            }
+          });
+        }
+
         // Format members data with activity data merged in
         const formattedMembers = membersResponse.data.map((member, index) => {
           const memberName =
@@ -81,13 +154,29 @@ const MembersDashboard = () => {
           ].filter((name) => name);
 
           let activityData = { activities: 0, totalDistance: 0 };
+          let activeDays = 0;
 
           // Find the first matching name in activity data
           for (const name of possibleNames) {
             if (memberActivityData[name]) {
               activityData = memberActivityData[name];
+            }
+            if (memberDailyActivities[name]) {
+              activeDays = memberDailyActivities[name].size;
+            }
+            if (activityData.activities > 0 && activeDays > 0) {
               break;
             }
+          }
+
+          // Calculate activities per day for activity level
+          const activitiesPerDay =
+            activeDays > 0 ? activityData.activities / activeDays : 0;
+          let activityLevel = 'Low';
+          if (activitiesPerDay >= 3) {
+            activityLevel = 'High';
+          } else if (activitiesPerDay >= 1) {
+            activityLevel = 'Medium';
           }
 
           return {
@@ -105,6 +194,9 @@ const MembersDashboard = () => {
                 : 0,
             status: 'Active', // All members are considered active
             joinDate: '2024-01-01', // Default date since not available in API
+            activityLevel: activityLevel,
+            activeDays: activeDays,
+            activitiesPerDay: Math.round(activitiesPerDay * 100) / 100,
           };
         });
 
@@ -125,25 +217,6 @@ const MembersDashboard = () => {
     fetchMembers();
   }, []);
 
-  // Process data for charts
-  const memberStats = members.reduce(
-    (acc, member) => {
-      acc.totalMembers += 1;
-      acc.totalActivities += member.activities;
-      acc.totalDistance += member.totalDistance;
-      acc.activeMembers += member.status === 'Active' ? 1 : 0;
-      acc.inactiveMembers += member.status === 'Inactive' ? 1 : 0;
-      return acc;
-    },
-    {
-      totalMembers: 0,
-      totalActivities: 0,
-      totalDistance: 0,
-      activeMembers: 0,
-      inactiveMembers: 0,
-    }
-  );
-
   const activityDistribution = members
     .map((member) => ({
       name: member.name.split(' ')[0], // First name only for chart
@@ -160,18 +233,6 @@ const MembersDashboard = () => {
     }))
     .sort((a, b) => b.distance - a.distance)
     .slice(0, 6); // Top 6 members
-
-  const averageActivities =
-    memberStats.totalMembers > 0
-      ? Math.round(memberStats.totalActivities / memberStats.totalMembers)
-      : 0;
-
-  const averageDistance =
-    memberStats.totalMembers > 0
-      ? Math.round(
-          (memberStats.totalDistance / memberStats.totalMembers) * 100
-        ) / 100
-      : 0;
 
   if (loading) {
     return (
@@ -239,7 +300,7 @@ const MembersDashboard = () => {
               <th title="Member activity status - All members are currently marked as Active">
                 Status
               </th>
-              <th title="Activity level based on total activities: High (10+), Medium (5-9), Low (0-4)">
+              <th title="Activity level based on activities per day: High (3+), Medium (1+), Low (&lt;1)">
                 Activity Level
               </th>
             </tr>
@@ -290,24 +351,20 @@ const MembersDashboard = () => {
                       fontSize: '0.75rem',
                       fontWeight: '500',
                       backgroundColor:
-                        member.activities >= 10
+                        member.activityLevel === 'High'
                           ? '#e6fffa'
-                          : member.activities >= 5
+                          : member.activityLevel === 'Medium'
                           ? '#fef5e7'
                           : '#fed7d7',
                       color:
-                        member.activities >= 10
+                        member.activityLevel === 'High'
                           ? '#00a085'
-                          : member.activities >= 5
+                          : member.activityLevel === 'Medium'
                           ? '#d69e2e'
                           : '#c53030',
                     }}
                   >
-                    {member.activities >= 10
-                      ? 'High'
-                      : member.activities >= 5
-                      ? 'Medium'
-                      : 'Low'}
+                    {member.activityLevel}
                   </span>
                 </td>
               </tr>
