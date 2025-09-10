@@ -23,7 +23,14 @@ function App() {
   return (
     <div className="App">
       <header className="app-header">
-        <h1>Walking Challenge Dashboard</h1>
+        <div className="header-top">
+          <img 
+            src="https://www.tecalliance.net/wp-content/uploads/TecAlliance-Logo-Web.svg" 
+            alt="TecAlliance" 
+            className="header-logo"
+          />
+          <h1>Walking Challenge Dashboard</h1>
+        </div>
         <nav className="nav-tabs">
           <button
             className={`nav-tab ${activeTab === 'activities' ? 'active' : ''}`}
