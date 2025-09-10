@@ -192,8 +192,8 @@ const MembersDashboard = () => {
                     activityData.totalDistance / activityData.activities
                   )
                 : 0,
-            status: 'Active', // All members are considered active
-            joinDate: '2024-01-01', // Default date since not available in API
+            status: 'Active',
+            joinDate: '2024-01-01', // Default date
             activityLevel: activityLevel,
             activeDays: activeDays,
             activitiesPerDay: Math.round(activitiesPerDay * 100) / 100,

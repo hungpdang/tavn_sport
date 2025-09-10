@@ -57,6 +57,7 @@ const GroupsDashboard = () => {
   const [error, setError] = useState(null);
   const [selectedDay, setSelectedDay] = useState(null);
   const [availableDays, setAvailableDays] = useState([]);
+  const [allMembersByTeam, setAllMembersByTeam] = useState({});
 
   const API_ENDPOINT = 'https://apptavn-ynfcnag4xa-uc.a.run.app/activities';
 
@@ -77,6 +78,7 @@ const GroupsDashboard = () => {
 
         // Process members data to get team structure
         const teamMembers = {};
+        const allMembersByTeam = {}; // Store detailed member info for the new table
         if (membersResponse.data && Array.isArray(membersResponse.data)) {
           membersResponse.data.forEach((member) => {
             const teamName = member.team || 'No Team';
@@ -89,6 +91,17 @@ const GroupsDashboard = () => {
               teamMembers[teamName] = new Set();
             }
             teamMembers[teamName].add(memberName);
+
+            // Store detailed member info for the new table
+            if (!allMembersByTeam[teamName]) {
+              allMembersByTeam[teamName] = [];
+            }
+            allMembersByTeam[teamName].push({
+              name: memberName,
+              firstName: member.firstname || '',
+              lastName: member.lastname || '',
+              webName: member.webName || '',
+            });
           });
         }
 
@@ -146,6 +159,7 @@ const GroupsDashboard = () => {
         }));
 
         setTeams(formattedTeams);
+        setAllMembersByTeam(allMembersByTeam);
 
         // Extract all available days and set current day as default
         const allDays = new Set();
@@ -303,6 +317,57 @@ const GroupsDashboard = () => {
           </tbody>
         </table>
       </div>
+
+      <div className="dashboard-card" style={{ marginBottom: '2rem' }}>
+        <div className="card-header">
+          <h3 className="card-title">Team Members</h3>
+          <span className="card-subtitle">All members organized by team</span>
+        </div>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Team Name</th>
+              <th>Members</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Object.keys(allMembersByTeam)
+              .sort()
+              .map((teamName) => (
+                <tr key={teamName}>
+                  <td style={{ fontWeight: '600' }}>{teamName}</td>
+                  <td>
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '0.5rem',
+                      }}
+                    >
+                      {allMembersByTeam[teamName].map((member, index) => (
+                        <span
+                          key={index}
+                          style={{
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            backgroundColor: '#f0f4ff',
+                            color: '#667eea',
+                            border: '1px solid #e2e8f0',
+                          }}
+                        >
+                          {member.name}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
+
       <div className="dashboard-card">
         <div className="card-header">
           <h3 className="card-title">Daily Team Activity</h3>
