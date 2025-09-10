@@ -32,10 +32,18 @@ body {
   gap: 1rem;
   margin-bottom: 1rem;
 }
-
+.header-logo-container{
+  margin: 0 auto;
+  max-width: 1200px;
+  width: 100%;
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+}
 .header-logo {
   width: auto;
-  position: absolute;
+  
   top: 15px;
   height: 40px;
   left: 0;
