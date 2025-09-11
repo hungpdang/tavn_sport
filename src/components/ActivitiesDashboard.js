@@ -54,15 +54,15 @@ const parseDateField = (dateString) => {
 // Team color mapping function for Distance Leaderboard table badges
 const getTeamColors = (teamName) => {
   const teamColors = {
-    'Chickens': { bg: '#B3E5FC', text: '#0277BD' },     // Light blue
-    'Hy2+': { bg: '#C8E6C9', text: '#2E7D32' },         // Soft green  
-    'Gooses': { bg: '#FCE4EC', text: '#C2185B' },       // Light pink
-    'H2T': { bg: '#FFF3E0', text: '#F57C00' },          // Peach
-    '3CE': { bg: '#F3E5F5', text: '#7B1FA2' },          // Lavender
-    'The Deans': { bg: '#E0F2F1', text: '#00695C' },    // Mint
-    'Ducks': { bg: '#FFF9C4', text: '#F9A825' },        // Pale yellow
+    Chickens: { bg: '#B3E5FC', text: '#0277BD' }, // Light blue
+    'Hy2+': { bg: '#C8E6C9', text: '#2E7D32' }, // Soft green
+    Gooses: { bg: '#FCE4EC', text: '#C2185B' }, // Light pink
+    H2T: { bg: '#FFF3E0', text: '#F57C00' }, // Peach
+    '3CE': { bg: '#F3E5F5', text: '#7B1FA2' }, // Lavender
+    'The Deans': { bg: '#E0F2F1', text: '#00695C' }, // Mint
+    Ducks: { bg: '#FFF9C4', text: '#F9A825' }, // Pale yellow
   };
-  
+
   return teamColors[teamName] || { bg: '#f0f4ff', text: '#667eea' };
 };
 
@@ -92,7 +92,7 @@ const ActivitiesDashboard = () => {
     fetchActivities();
   }, []);
 
-  // Process data for athlete distance leaderboard
+  // Process data for athlete distance leaderboard with daily cap logic
   const athleteDistances = activities.reduce((acc, activity) => {
     const athleteName = `${activity.athlete?.firstname} ${activity.athlete?.lastname}`;
     if (!acc[athleteName]) {
@@ -100,11 +100,50 @@ const ActivitiesDashboard = () => {
         name: athleteName,
         team: activity.athlete?.team || 'No Team',
         totalDistance: 0,
+        cappedDistance: 0,
         activityCount: 0,
         activities: [],
+        dailyDistances: {}, // Track daily distances for capping
       };
     }
-    acc[athleteName].totalDistance += activity.distance || 0;
+
+    // Get the date for this activity
+    const dateField =
+      activity.date ||
+      activity.date_committed ||
+      activity.date_fetch ||
+      activity.daymonth;
+    const parsedDate = parseDateField(dateField);
+    const dayMonth = parsedDate?.dayMonth || 'Unknown';
+
+    // Initialize daily distance tracking for this day
+    if (!acc[athleteName].dailyDistances[dayMonth]) {
+      acc[athleteName].dailyDistances[dayMonth] = 0;
+    }
+
+    const activityDistance = activity.distance || 0;
+    const currentDailyDistance = acc[athleteName].dailyDistances[dayMonth];
+    const maxDailyDistance = 10000; // 10km in meters
+
+    // Calculate how much distance can be added today (considering the 10km daily cap)
+    const remainingDailyCapacity = Math.max(
+      0,
+      maxDailyDistance - currentDailyDistance
+    );
+    const distanceToAdd = Math.min(activityDistance, remainingDailyCapacity);
+
+    // Update daily distance (capped at 10km)
+    acc[athleteName].dailyDistances[dayMonth] = Math.min(
+      currentDailyDistance + activityDistance,
+      maxDailyDistance
+    );
+
+    // Add to total distance (uncapped)
+    acc[athleteName].totalDistance += activityDistance;
+
+    // Add to capped distance (with daily cap applied)
+    acc[athleteName].cappedDistance += distanceToAdd;
+
     acc[athleteName].activityCount += 1;
     acc[athleteName].activities.push(activity);
     return acc;
@@ -150,24 +189,69 @@ const ActivitiesDashboard = () => {
     delete day.teams;
   });
 
-  // Process data for team distance leaderboard
+  // Process data for team distance leaderboard with daily cap logic
   const teamDistances = activities.reduce((acc, activity) => {
     const teamName = activity.athlete?.team || 'No Team';
+    const athleteName = `${activity.athlete?.firstname} ${activity.athlete?.lastname}`;
+
     if (!acc[teamName]) {
       acc[teamName] = {
         name: teamName,
         totalDistance: 0,
+        cappedDistance: 0,
         activityCount: 0,
         athleteCount: 0,
         athletes: new Set(),
         activities: [],
+        athleteDailyDistances: {}, // Track each athlete's daily distances for capping
       };
     }
-    acc[teamName].totalDistance += activity.distance || 0;
-    acc[teamName].activityCount += 1;
-    acc[teamName].athletes.add(
-      `${activity.athlete?.firstname} ${activity.athlete?.lastname}`
+
+    // Initialize athlete daily distance tracking
+    if (!acc[teamName].athleteDailyDistances[athleteName]) {
+      acc[teamName].athleteDailyDistances[athleteName] = {};
+    }
+
+    // Get the date for this activity
+    const dateField =
+      activity.date ||
+      activity.date_committed ||
+      activity.date_fetch ||
+      activity.daymonth;
+    const parsedDate = parseDateField(dateField);
+    const dayMonth = parsedDate?.dayMonth || 'Unknown';
+
+    // Initialize daily distance tracking for this athlete and day
+    if (!acc[teamName].athleteDailyDistances[athleteName][dayMonth]) {
+      acc[teamName].athleteDailyDistances[athleteName][dayMonth] = 0;
+    }
+
+    const activityDistance = activity.distance || 0;
+    const currentDailyDistance =
+      acc[teamName].athleteDailyDistances[athleteName][dayMonth];
+    const maxDailyDistance = 10000; // 10km in meters
+
+    // Calculate how much distance can be added today (considering the 10km daily cap)
+    const remainingDailyCapacity = Math.max(
+      0,
+      maxDailyDistance - currentDailyDistance
     );
+    const distanceToAdd = Math.min(activityDistance, remainingDailyCapacity);
+
+    // Update daily distance (capped at 10km)
+    acc[teamName].athleteDailyDistances[athleteName][dayMonth] = Math.min(
+      currentDailyDistance + activityDistance,
+      maxDailyDistance
+    );
+
+    // Add to total distance (uncapped)
+    acc[teamName].totalDistance += activityDistance;
+
+    // Add to capped distance (with daily cap applied)
+    acc[teamName].cappedDistance += distanceToAdd;
+
+    acc[teamName].activityCount += 1;
+    acc[teamName].athletes.add(athleteName);
     acc[teamName].activities.push(activity);
     return acc;
   }, {});
@@ -178,25 +262,27 @@ const ActivitiesDashboard = () => {
     delete team.athletes; // Remove Set object
   });
 
-  // Sort athletes by total distance (descending)
+  // Sort athletes by capped distance (descending) - this is the new ranking method
   const leaderboardData = Object.values(athleteDistances)
-    .sort((a, b) => b.totalDistance - a.totalDistance)
+    .sort((a, b) => b.cappedDistance - a.cappedDistance)
     .map((athlete, index) => ({
       ...athlete,
       rank: index + 1,
       totalDistanceKm: Math.round((athlete.totalDistance / 1000) * 100) / 100, // Convert to km with 2 decimal places
+      cappedDistanceKm: Math.round((athlete.cappedDistance / 1000) * 100) / 100, // Convert to km with 2 decimal places
       averageDistance: Math.round(
         athlete.totalDistance / athlete.activityCount
       ),
     }));
 
-  // Sort teams by total distance (descending)
+  // Sort teams by capped distance (descending) - this is the new ranking method
   const teamLeaderboardData = Object.values(teamDistances)
-    .sort((a, b) => b.totalDistance - a.totalDistance)
+    .sort((a, b) => b.cappedDistance - a.cappedDistance)
     .map((team, index) => ({
       ...team,
       rank: index + 1,
       totalDistanceKm: Math.round((team.totalDistance / 1000) * 100) / 100,
+      cappedDistanceKm: Math.round((team.cappedDistance / 1000) * 100) / 100,
       averageDistance: Math.round(team.totalDistance / team.activityCount),
       averageDistancePerAthlete: Math.round(
         team.totalDistance / team.athleteCount
@@ -253,17 +339,22 @@ const ActivitiesDashboard = () => {
         <div className="card-header">
           <h3 className="card-title">Team Distance Leaderboard</h3>
           <span className="card-subtitle">
-            Teams ranked by total distance covered
+            Teams ranked by capped distance (10km daily limit per member)
           </span>
         </div>
         <table className="data-table">
           <thead>
             <tr>
-              <th title="Team ranking based on total distance covered (1st, 2nd, 3rd place highlighted)">
+              <th title="Team ranking based on capped distance (10km daily limit per member)">
                 Rank
               </th>
               <th>Team</th>
-              <th>Total Distance (km)</th>
+              <th title="Total distance with 10km daily cap per member applied">
+                Capped Distance (km)
+              </th>
+              <th title="Total distance without daily cap">
+                Total Distance (km)
+              </th>
               <th title="Total number of activities completed by this team">
                 Activities
               </th>
@@ -303,6 +394,9 @@ const ActivitiesDashboard = () => {
                 </td>
                 <td style={{ fontWeight: '600' }}>{team.name}</td>
                 <td style={{ fontWeight: '600', color: '#2d3748' }}>
+                  {team.cappedDistanceKm.toFixed(2)} km
+                </td>
+                <td style={{ fontWeight: '500', color: '#718096' }}>
                   {team.totalDistanceKm.toFixed(2)} km
                 </td>
                 <td>{team.activityCount}</td>
@@ -316,11 +410,12 @@ const ActivitiesDashboard = () => {
 
       <div className="dashboard-grid" style={{ marginBottom: '2rem' }}>
         <div className="chart-container">
-          <h3 className="chart-title">Total Distance by Athlete</h3>
+          <h3 className="chart-title">Capped Distance by Athlete</h3>
           <ResponsiveContainer width="100%" height={400}>
             <BarChart
               data={leaderboardData.map((athlete) => ({
                 name: athlete.name.split(' ')[0], // First name only for chart
+                cappedDistance: athlete.cappedDistanceKm,
                 totalDistance: athlete.totalDistanceKm,
               }))}
             >
@@ -328,23 +423,29 @@ const ActivitiesDashboard = () => {
               <XAxis dataKey="name" />
               <YAxis />
               <Tooltip
-                formatter={(value) => [`${value} km`, 'Total Distance']}
+                formatter={(value, name) => [
+                  `${value} km`,
+                  name === 'cappedDistance'
+                    ? 'Capped Distance'
+                    : 'Total Distance',
+                ]}
               />
               <Bar
-                dataKey="totalDistance"
+                dataKey="cappedDistance"
                 fill="#00C49F"
-                name="Total Distance"
+                name="Capped Distance"
               />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
         <div className="chart-container">
-          <h3 className="chart-title">Total Distance by Team</h3>
+          <h3 className="chart-title">Capped Distance by Team</h3>
           <ResponsiveContainer width="100%" height={400}>
             <BarChart
               data={teamLeaderboardData.map((team) => ({
                 name: team.name,
+                cappedDistance: team.cappedDistanceKm,
                 totalDistance: team.totalDistanceKm,
               }))}
             >
@@ -352,12 +453,17 @@ const ActivitiesDashboard = () => {
               <XAxis dataKey="name" />
               <YAxis />
               <Tooltip
-                formatter={(value) => [`${value} km`, 'Total Distance']}
+                formatter={(value, name) => [
+                  `${value} km`,
+                  name === 'cappedDistance'
+                    ? 'Capped Distance'
+                    : 'Total Distance',
+                ]}
               />
               <Bar
-                dataKey="totalDistance"
+                dataKey="cappedDistance"
                 fill="#667eea"
-                name="Total Distance"
+                name="Capped Distance"
               />
             </BarChart>
           </ResponsiveContainer>
@@ -368,18 +474,23 @@ const ActivitiesDashboard = () => {
         <div className="card-header">
           <h3 className="card-title">Distance Leaderboard</h3>
           <span className="card-subtitle">
-            Athletes ranked by total distance covered
+            Athletes ranked by capped distance (10km daily limit per member)
           </span>
         </div>
         <table className="data-table">
           <thead>
             <tr>
-              <th title="Athlete ranking based on total distance covered (1st, 2nd, 3rd place highlighted)">
+              <th title="Athlete ranking based on capped distance (10km daily limit per member)">
                 Rank
               </th>
               <th>Athlete</th>
               <th>Team</th>
-              <th>Total Distance (km)</th>
+              <th title="Total distance with 10km daily cap per member applied">
+                Capped Distance (km)
+              </th>
+              <th title="Total distance without daily cap">
+                Total Distance (km)
+              </th>
               <th title="Total number of activities completed by this athlete">
                 Activities
               </th>
@@ -439,6 +550,9 @@ const ActivitiesDashboard = () => {
                     </span>
                   </td>
                   <td style={{ fontWeight: '600', color: '#2d3748' }}>
+                    {athlete.cappedDistanceKm.toFixed(2)} km
+                  </td>
+                  <td style={{ fontWeight: '500', color: '#718096' }}>
                     {athlete.totalDistanceKm.toFixed(2)} km
                   </td>
                   <td>{athlete.activityCount}</td>
