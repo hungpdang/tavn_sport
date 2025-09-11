@@ -51,6 +51,21 @@ const parseDateField = (dateString) => {
   }
 };
 
+// Team color mapping function for Distance Leaderboard table badges
+const getTeamColors = (teamName) => {
+  const teamColors = {
+    'Chickens': { bg: '#B3E5FC', text: '#0277BD' },     // Light blue
+    'Hy2+': { bg: '#C8E6C9', text: '#2E7D32' },         // Soft green  
+    'Gooses': { bg: '#FCE4EC', text: '#C2185B' },       // Light pink
+    'H2T': { bg: '#FFF3E0', text: '#F57C00' },          // Peach
+    '3CE': { bg: '#F3E5F5', text: '#7B1FA2' },          // Lavender
+    'The Deans': { bg: '#E0F2F1', text: '#00695C' },    // Mint
+    'Ducks': { bg: '#FFF9C4', text: '#F9A825' },        // Pale yellow
+  };
+  
+  return teamColors[teamName] || { bg: '#f0f4ff', text: '#667eea' };
+};
+
 const ActivitiesDashboard = () => {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -416,8 +431,8 @@ const ActivitiesDashboard = () => {
                         borderRadius: '8px',
                         fontSize: '0.75rem',
                         fontWeight: '500',
-                        backgroundColor: '#f0f4ff',
-                        color: '#667eea',
+                        backgroundColor: getTeamColors(athlete.team).bg,
+                        color: getTeamColors(athlete.team).text,
                       }}
                     >
                       {athlete.team}

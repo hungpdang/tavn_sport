@@ -1,0 +1,158 @@
+Here's a comprehensive prompt system for the Builder to implement team-specific pastel colors across all tables with teams:
+
+Build Implementation Prompt: Expand Team Colors to All Tables
+OBJECTIVE:
+Apply the existing team-specific pastel color system to ALL tables that display team information, following the successful implementation pattern from the Distance Leaderboard table.
+
+IMPLEMENTATION PHASES:
+PHASE 1: High Priority Team Badges
+Task 1A: All Members Table (MembersDashboard.js)
+EXACT LOCATION:
+File: src/components/MembersDashboard.js
+Target: Lines 319-320 (team badges in TEAM column)
+Current styling: backgroundColor: '#f0f4ff', color: '#667eea'
+IMPLEMENTATION STEPS:
+Step 1: Add team color mapping function at the top of MembersDashboard component (after imports, before main component function):
+
+// Team color mapping function for team badges
+const getTeamColors = (teamName) => {
+  const teamColors = {
+    'Chickens': { bg: '#B3E5FC', text: '#0277BD' },     // Light blue
+    'Hy2+': { bg: '#C8E6C9', text: '#2E7D32' },         // Soft green  
+    'Gooses': { bg: '#FCE4EC', text: '#C2185B' },       // Light pink
+    'H2T': { bg: '#FFF3E0', text: '#F57C00' },          // Peach
+    '3CE': { bg: '#F3E5F5', text: '#7B1FA2' },          // Lavender
+    'The Deans': { bg: '#E0F2F1', text: '#00695C' },    // Mint
+    'Ducks': { bg: '#FFF9C4', text: '#F9A825' },        // Pale yellow
+  };
+  
+  return teamColors[teamName] || { bg: '#f0f4ff', text: '#667eea' };
+};
+Step 2: Update team badge styling in All Members Table:
+FIND:
+
+backgroundColor: '#f0f4ff',
+color: '#667eea',
+REPLACE WITH:
+
+backgroundColor: getTeamColors(member.team).bg,
+color: getTeamColors(member.team).text,
+Task 1B: Team Members Table (GroupsDashboard.js)
+EXACT LOCATION:
+File: src/components/GroupsDashboard.js
+Target: Lines 355-356 (member name badges in Team Members table)
+Current styling: backgroundColor: '#f0f4ff', color: '#667eea'
+IMPLEMENTATION STEPS:
+Step 1: Add team color mapping function at the top of GroupsDashboard component (identical to above)
+
+Step 2: Update member badge styling in Team Members table:
+FIND:
+
+backgroundColor: '#f0f4ff',
+color: '#667eea',
+REPLACE WITH:
+
+backgroundColor: getTeamColors(teamName).bg,
+color: getTeamColors(teamName).text,
+PHASE 2: Optional Enhancements (If Requested)
+Task 2A: Team Names Background Colors
+GroupsDashboard.js - Teams Table team names (Line 273):
+Add subtle background color to team names:
+
+<td style={{ 
+  fontWeight: '600',
+  backgroundColor: `${getTeamColors(team.name).bg}20`, // 20% opacity
+  padding: '0.5rem',
+  borderRadius: '4px'
+}}>
+  {team.name}
+</td>
+GroupsDashboard.js - Team Members table team names (Line 338):
+Add subtle background color to team names:
+
+<td style={{ 
+  fontWeight: '600',
+  backgroundColor: `${getTeamColors(teamName).bg}20`, // 20% opacity
+  padding: '0.5rem',
+  borderRadius: '4px'
+}}>
+  {teamName}
+</td>
+Task 2B: Chart Bar Colors (Advanced)
+ActivitiesDashboard.js - Total Distance by Team chart:
+FIND:
+
+<Bar dataKey="totalDistance" fill="#667eea" name="Total Distance" />
+REPLACE WITH:
+
+<Bar dataKey="totalDistance" name="Total Distance">
+  {teamLeaderboardData.map((team, index) => (
+    <Cell key={`cell-${index}`} fill={getTeamColors(team.name).bg} />
+  ))}
+</Bar>
+ALSO ADD IMPORT:
+
+import { Cell } from 'recharts';
+GroupsDashboard.js - Distance per Team chart:
+FIND:
+
+<Bar dataKey="distance" fill="#8884D8" />
+REPLACE WITH:
+
+<Bar dataKey="distance">
+  {chartData.map((entry, index) => (
+    <Cell key={`cell-${index}`} fill={getTeamColors(entry.name).bg} />
+  ))}
+</Bar>
+ALSO ADD IMPORT:
+
+import { Cell } from 'recharts';
+REQUIREMENTS:
+MANDATORY:
+PRESERVE all existing functionality and logic
+MAINTAIN current badge styling (padding, border-radius, font-size, font-weight)
+ENSURE good contrast between background and text colors
+HANDLE unknown teams with fallback to original colors (#f0f4ff bg, #667eea text)
+KEEP same team color mappings across all components
+CONSTRAINTS:
+DO NOT modify chart colors unless specifically requested for Phase 2
+DO NOT change any other styling beyond team-related elements
+DO NOT affect ranking badges, status badges, or distance rate badges
+USE EXACT same color palette across all components
+EXPECTED RESULTS:
+Phase 1 Complete:
+✅ All Members Table: Team badges show team-specific pastel colors
+✅ Team Members Table: Member badges show their team's pastel colors
+✅ Consistent colors across all team badges throughout the application
+Phase 2 Complete (Optional):
+✅ Team names have subtle background colors in tables
+✅ Chart bars use team-specific colors instead of single colors
+VALIDATION CHECKS:
+Critical Tests:
+✅ Application compiles without errors
+✅ All Members Table displays team badges with correct team colors
+✅ Team Members Table displays member badges with correct team colors
+✅ Color consistency between all team badge instances
+✅ Unknown teams display with fallback colors
+✅ No regression in other functionalities (status badges, ranking, etc.)
+Visual Verification:
+✅ Chickens = Light blue badges
+✅ Hy2+ = Soft green badges
+✅ Gooses = Light pink badges
+✅ H2T = Peach badges
+✅ 3CE = Lavender badges
+✅ The Deans = Mint badges
+✅ Ducks = Pale yellow badges
+FILES TO MODIFY:
+Phase 1: src/components/MembersDashboard.js, src/components/GroupsDashboard.js
+Phase 2: Same files + chart imports
+FILES TO NOT TOUCH:
+src/components/ActivitiesDashboard.js (already completed)
+src/App.css
+Any ranking, status, or distance rate badge styling
+EXECUTION ORDER:
+Start with Phase 1, Task 1A (All Members Table) - highest user priority
+Then Phase 1, Task 1B (Team Members Table)
+Test and verify Phase 1 completion
+Proceed to Phase 2 only if requested
+This systematic approach ensures consistent team colors across the entire application while maintaining code quality and user experience.
