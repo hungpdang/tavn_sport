@@ -89,6 +89,13 @@ body {
   }
 }
 
+/* WIDE DESKTOP: Fix alignment when max-width is active */
+@media (min-width: calc(1200px + 4rem)) {
+  .header-top {
+    padding: 0 2rem;
+  }
+}
+
 .nav-tabs {
   display: flex;
   justify-content: center;
