@@ -23,15 +23,12 @@ function App() {
   return (
     <div className="App">
       <header className="app-header">
-        <div className="header-logo-container">
+        <div className="header-top">
           <img 
             src="https://www.tecalliance.net/wp-content/uploads/TecAlliance-Logo-Web.svg" 
             alt="TecAlliance" 
             className="header-logo"
           />
-        </div>
-        <div className="header-top">
-          
           <h1>Walking Challenge Dashboard</h1>
         </div>
         <nav className="nav-tabs">

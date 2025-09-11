@@ -1,0 +1,206 @@
+Build Implementation Prompt: Responsive Logo Mobile-First
+OBJECTIVE:
+Implement responsive logo sizing for viewports below 1024px using mobile-first CSS approach while maintaining minimal impact to current code architecture.
+
+PRIORITY REQUIREMENTS:
+✅ LOW IMPACT - Preserve existing desktop layout and functionality
+✅ MOBILE-FIRST - Use min-width media queries for progressive enhancement
+✅ 1024px BREAKPOINT - Target responsive behavior below 1024px as specified
+✅ LOGO SIZING - Optimize logo sizes for different device categories
+IMPLEMENTATION STRATEGY:
+Phase 1: Minimal HTML Restructuring (App.js)
+EXACT LOCATION:
+File: src/App.js
+Target: Lines 25-36 (header structure)
+MINIMAL CHANGE APPROACH:
+FIND:
+
+<header className="app-header">
+  <div className="header-logo-container">
+    <img 
+      src="https://www.tecalliance.net/wp-content/uploads/TecAlliance-Logo-Web.svg" 
+      alt="TecAlliance" 
+      className="header-logo"
+    />
+  </div>
+  <div className="header-top">
+    <h1>Walking Challenge Dashboard</h1>
+  </div>
+REPLACE WITH:
+
+<header className="app-header">
+  <div className="header-top">
+    <img 
+      src="https://www.tecalliance.net/wp-content/uploads/TecAlliance-Logo-Web.svg" 
+      alt="TecAlliance" 
+      className="header-logo"
+    />
+    <h1>Walking Challenge Dashboard</h1>
+  </div>
+Impact: ✅ MINIMAL - Only moves logo to existing container
+
+Phase 2: Mobile-First CSS Implementation (App.css)
+EXACT LOCATION:
+File: src/App.css
+Target: Lines 29-51 (header styling)
+STEP 1: Remove Complex Positioning
+FIND AND DELETE:
+
+.header-logo-container{
+  margin: 0 auto;
+  max-width: 1200px;
+  width: 100%;
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+STEP 2: Replace with Mobile-First Approach
+FIND:
+
+.header-top {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.header-logo {
+  width: auto;
+  top: 15px;
+  height: 40px;
+  left: 0;
+  margin-left: 48px;
+}
+.app-header h1 {
+  font-size: 2rem;
+  font-weight: 600;
+  margin: 0;
+  text-align: center;
+  flex: 1;
+}
+REPLACE WITH:
+
+/* MOBILE-FIRST: Base styles for mobile devices */
+.header-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.header-logo {
+  height: 30px;
+  width: auto;
+}
+.app-header h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+  text-align: center;
+  line-height: 1.2;
+}
+/* TABLET ENHANCEMENT: 768px and up */
+@media (min-width: 768px) {
+  .header-logo {
+    height: 35px;
+  }
+  
+  .app-header h1 {
+    font-size: 1.75rem;
+  }
+  
+  .header-top {
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+}
+/* DESKTOP ENHANCEMENT: 1024px and up */
+@media (min-width: 1024px) {
+  .header-top {
+    flex-direction: row;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .header-logo {
+    height: 40px;
+  }
+  
+  .app-header h1 {
+    font-size: 2rem;
+    flex: 1;
+  }
+}
+DEVICE-SPECIFIC SIZING STRATEGY:
+📱 Mobile (Base - No Media Query)
+.header-logo { height: 30px; }
+.app-header h1 { font-size: 1.5rem; }
+.header-top { flex-direction: column; gap: 0.5rem; }
+📱 Tablet (≥768px)
+.header-logo { height: 35px; }
+.app-header h1 { font-size: 1.75rem; }
+.header-top { gap: 0.75rem; }
+🖥️ Desktop (≥1024px)
+.header-logo { height: 40px; }
+.app-header h1 { font-size: 2rem; }
+.header-top { flex-direction: row; gap: 1rem; }
+CRITICAL REQUIREMENTS:
+MANDATORY CONSTRAINTS:
+PRESERVE DESKTOP LAYOUT - Exact same appearance on ≥1024px screens
+NO FUNCTIONAL CHANGES - All navigation and features work identically
+MINIMAL CODE CHANGES - Only modify header-related styles
+MOBILE-FIRST APPROACH - Use min-width media queries exclusively
+SMOOTH TRANSITIONS - No jarring layout shifts between breakpoints
+FORBIDDEN CHANGES:
+❌ DO NOT modify navigation button styles
+❌ DO NOT change main content layout
+❌ DO NOT affect team color functionalities
+❌ DO NOT modify any component files
+❌ DO NOT change existing CSS classes for other elements
+
+VALIDATION REQUIREMENTS:
+Critical Tests:
+✅ Desktop (≥1024px): Logo left, title center (unchanged)
+✅ Tablet (768-1023px): Logo center, title center, larger sizes
+✅ Mobile (<768px): Logo center, title center, compact sizes
+✅ Compilation: No CSS or React errors
+✅ Navigation: All tabs work correctly
+✅ Responsive: Smooth transitions between breakpoints
+Visual Verification:
+Logo properly sized and positioned at all breakpoints
+Title remains readable and well-proportioned
+No horizontal scrolling on any device
+Clean vertical stacking on mobile devices
+FILES TO MODIFY:
+Phase 1:
+ONLY src/App.js (2 lines: move logo into header-top)
+Phase 2:
+ONLY src/App.css (replace header styles with mobile-first approach)
+FILES TO NOT TOUCH:
+src/components/ActivitiesDashboard.js (team colors working)
+src/components/GroupsDashboard.js (team colors working)
+src/components/MembersDashboard.js (team colors working)
+Any other component files
+Navigation or content area styles
+IMPLEMENTATION SEQUENCE:
+Step 1: Modify App.js header structure (1 minute)
+Step 2: Remove old CSS positioning (1 minute)
+Step 3: Add mobile-first responsive CSS (3 minutes)
+Step 4: Test all three breakpoints (2 minutes)
+Step 5: Verify no regressions (1 minute)
+Total Implementation Time: ~8 minutes
+
+EXPECTED OUTCOME:
+Mobile (<768px):
+Logo: 30px height, centered above title
+Title: 1.5rem, centered below logo
+Layout: Vertical stack, compact spacing
+Tablet (768-1023px):
+Logo: 35px height, centered above title
+Title: 1.75rem, centered below logo
+Layout: Vertical stack, medium spacing
+Desktop (≥1024px):
+Logo: 40px height, positioned left
+Title: 2rem, centered with flex: 1
+Layout: Horizontal row (current design preserved)
+This approach ensures minimal architectural impact while delivering optimal mobile experience through progressive enhancement.
