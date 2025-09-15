@@ -3,6 +3,7 @@ import './App.css';
 import ActivitiesDashboard from './components/ActivitiesDashboard';
 import GroupsDashboard from './components/GroupsDashboard';
 import MembersDashboard from './components/MembersDashboard';
+import FirstWeekChallenge from './components/FirstWeekChallenge';
 
 function App() {
   const [activeTab, setActiveTab] = useState('activities');
@@ -15,6 +16,8 @@ function App() {
         return <GroupsDashboard />;
       case 'members':
         return <MembersDashboard />;
+      case 'firstWeek':
+        return <FirstWeekChallenge />;
       default:
         return <ActivitiesDashboard />;
     }
@@ -23,12 +26,14 @@ function App() {
   return (
     <div className="App">
       <header className="app-header">
-        <div className="header-top">
-          <img 
-            src="https://www.tecalliance.net/wp-content/uploads/TecAlliance-Logo-Web.svg" 
-            alt="TecAlliance" 
+        <div className="header-logo-container">
+          <img
+            src="https://www.tecalliance.net/wp-content/uploads/TecAlliance-Logo-Web.svg"
+            alt="TecAlliance"
             className="header-logo"
           />
+        </div>
+        <div className="header-top">
           <h1>Walking Challenge Dashboard</h1>
         </div>
         <nav className="nav-tabs">
@@ -49,6 +54,12 @@ function App() {
             onClick={() => setActiveTab('members')}
           >
             Individuals
+          </button>
+          <button
+            className={`nav-tab ${activeTab === 'firstWeek' ? 'active' : ''}`}
+            onClick={() => setActiveTab('firstWeek')}
+          >
+            First 7-day Challenge
           </button>
         </nav>
       </header>

@@ -239,6 +239,7 @@ const ActivitiesDashboard = () => {
     const distanceToAdd = Math.min(activityDistance, remainingDailyCapacity);
 
     // Update daily distance (capped at 10km)
+    // This ensures that even if someone does multiple activities, the daily total never exceeds 10km
     acc[teamName].athleteDailyDistances[athleteName][dayMonth] = Math.min(
       currentDailyDistance + activityDistance,
       maxDailyDistance
