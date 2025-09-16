@@ -4,6 +4,7 @@ import ActivitiesDashboard from './components/ActivitiesDashboard';
 import GroupsDashboard from './components/GroupsDashboard';
 import MembersDashboard from './components/MembersDashboard';
 import FirstWeekChallenge from './components/FirstWeekChallenge';
+import Week2Challenge from './components/Week2Challenge';
 
 function App() {
   const [activeTab, setActiveTab] = useState('activities');
@@ -18,6 +19,8 @@ function App() {
         return <MembersDashboard />;
       case 'firstWeek':
         return <FirstWeekChallenge />;
+      case 'secondWeek':
+        return <Week2Challenge />;
       default:
         return <ActivitiesDashboard />;
     }
@@ -59,7 +62,13 @@ function App() {
             className={`nav-tab ${activeTab === 'firstWeek' ? 'active' : ''}`}
             onClick={() => setActiveTab('firstWeek')}
           >
-            First 7-day Challenge
+            Week 1 Challenge
+          </button>
+          <button
+            className={`nav-tab ${activeTab === 'secondWeek' ? 'active' : ''}`}
+            onClick={() => setActiveTab('secondWeek')}
+          >
+            Week 2 Challenge
           </button>
         </nav>
       </header>

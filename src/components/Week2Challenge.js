@@ -9,30 +9,24 @@ const parseDateField = (dateString) => {
   const cleanDateString = dateString.replace(/\n\s+/g, ' ').trim();
 
   try {
-    // Handle the specific format: "Mon, 08 Sep, 2025 - 12:56:34"
-    // Convert to a more standard format that Date can parse
     let dateToParse = cleanDateString;
 
-    // If it contains the format "Mon, 08 Sep, 2025 - 12:56:34"
     if (dateToParse.includes(' - ')) {
-      // Replace " - " with " " to make it "Mon, 08 Sep, 2025 12:56:34"
       dateToParse = dateToParse.replace(' - ', ' ');
     }
 
     const date = new Date(dateToParse);
 
-    // Check if the date is valid
     if (isNaN(date.getTime())) {
       console.warn('Invalid date parsed:', dateString, '->', dateToParse);
       return null;
     }
 
-    // Extract day and month in MM/DD format
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
 
     return {
-      dayMonth: `${month}${day}`, // Keep original format for compatibility
+      dayMonth: `${month}${day}`,
       formattedDate: `${month}/${day}`,
       fullDate: date,
     };
@@ -57,7 +51,7 @@ const getTeamColors = (teamName) => {
   return teamColors[teamName] || { bg: '#f0f4ff', text: '#667eea' };
 };
 
-const FirstWeekChallenge = () => {
+const Week2Challenge = () => {
   const [athletes, setAthletes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -65,15 +59,15 @@ const FirstWeekChallenge = () => {
   const [expandedTeams, setExpandedTeams] = useState(new Set());
 
   const API_ENDPOINT =
-    'https://apptavn-ynfcnag4xa-uc.a.run.app/activities?period=firstWeek';
+    'https://apptavn-ynfcnag4xa-uc.a.run.app/activities?period=secondWeek';
 
   useEffect(() => {
-    const fetchFirstWeekActivities = async () => {
+    const fetchSecondWeekActivities = async () => {
       try {
         setLoading(true);
-        console.log('Fetching first week activities from:', API_ENDPOINT);
+        console.log('Fetching second week activities from:', API_ENDPOINT);
         const response = await axios.get(API_ENDPOINT);
-        console.log('First Week API Response:', response.data);
+        console.log('Second Week API Response:', response.data);
 
         // Process the data to calculate capped distances
         const processedAthletes = response.data.map((athleteData) => {
@@ -114,21 +108,23 @@ const FirstWeekChallenge = () => {
               maxDailyDistance
             );
 
-            // Add to totals
+            // Add to total distance (uncapped)
             totalDistance += activityDistance;
+
+            // Add to capped distance (with daily cap applied)
             cappedDistance += distanceToAdd;
           });
 
           return {
             name: athlete_name,
             team: team,
-            activities: activities,
             totalDistance: totalDistance,
             cappedDistance: cappedDistance,
+            activityCount: activities.length,
+            activities: activities,
+            dailyDistances: dailyDistances,
             totalDistanceKm: Math.round((totalDistance / 1000) * 100) / 100,
             cappedDistanceKm: Math.round((cappedDistance / 1000) * 100) / 100,
-            activityCount: activities.length,
-            dailyDistances: dailyDistances,
           };
         });
 
@@ -138,15 +134,15 @@ const FirstWeekChallenge = () => {
         );
 
         setAthletes(sortedAthletes);
-        setLoading(false);
       } catch (err) {
-        console.error('Error fetching first week activities:', err);
-        setError('Failed to fetch first week activities');
+        console.error('Error fetching second week activities:', err);
+        setError('Failed to load second week challenge data');
+      } finally {
         setLoading(false);
       }
     };
 
-    fetchFirstWeekActivities();
+    fetchSecondWeekActivities();
   }, []);
 
   const toggleExpanded = (athleteName) => {
@@ -172,13 +168,17 @@ const FirstWeekChallenge = () => {
   if (loading) {
     return (
       <div className="loading">
-        <div>Loading first week challenge data...</div>
+        <div>Loading second week challenge data...</div>
       </div>
     );
   }
 
   if (error) {
-    return <div className="error">{error}</div>;
+    return (
+      <div className="error">
+        <div>{error}</div>
+      </div>
+    );
   }
 
   // Calculate team statistics
@@ -223,7 +223,7 @@ const FirstWeekChallenge = () => {
       {/* Team Leaderboard */}
       <div className="dashboard-card" style={{ marginBottom: '2rem' }}>
         <div className="card-header">
-          <h3 className="card-title">Week 1 Challenge - Team Rankings</h3>
+          <h3 className="card-title">Week 2 Challenge - Team Rankings</h3>
           <span className="card-subtitle">
             Teams ranked by total capped distance (10km daily limit per member)
           </span>
@@ -233,7 +233,7 @@ const FirstWeekChallenge = () => {
             <tr>
               <th title="Team ranking based on total capped distance">Rank</th>
               <th>Team</th>
-              <th title="Total capped distance for all team members">
+              <th title="Total distance with 10km daily cap per member applied">
                 Capped Distance (km)
               </th>
               <th title="Total distance without daily cap">
@@ -485,7 +485,7 @@ const FirstWeekChallenge = () => {
       {/* Individual Athlete Leaderboard */}
       <div className="dashboard-card">
         <div className="card-header">
-          <h3 className="card-title">Week 1 Challenge - Individual Rankings</h3>
+          <h3 className="card-title">Week 2 Challenge - Individual Rankings</h3>
           <span className="card-subtitle">
             Athletes ranked by capped distance (10km daily limit per member)
           </span>
@@ -493,27 +493,26 @@ const FirstWeekChallenge = () => {
         <table className="data-table">
           <thead>
             <tr>
-              <th title="Athlete ranking based on capped distance (10km daily limit per member)">
+              <th title="Athlete ranking based on total capped distance">
                 Rank
               </th>
               <th>Athlete</th>
               <th>Team</th>
-              <th title="Total distance with 10km daily cap per member applied">
+              <th title="Total distance with 10km daily cap applied">
                 Capped Distance (km)
               </th>
               <th title="Total distance without daily cap">
                 Total Distance (km)
               </th>
-              <th title="Total number of activities completed by this athlete">
-                Activities
-              </th>
-              <th title="View detailed activities">Details</th>
+              <th title="Number of activities completed">Activities</th>
+              <th title="View individual activity details">Details</th>
             </tr>
           </thead>
           <tbody>
             {athletes.map((athlete, index) => {
               const rank = index + 1;
               const isTop5 = rank <= 5;
+              const isTop3 = rank <= 3;
               const isExpanded = expandedAthletes.has(athlete.name);
 
               return (
@@ -540,10 +539,8 @@ const FirstWeekChallenge = () => {
                               ? '#C0C0C0'
                               : rank === 3
                               ? '#CD7F32'
-                              : isTop5
-                              ? '#667eea'
                               : '#f0f4ff',
-                          color: rank <= 3 || isTop5 ? 'white' : '#667eea',
+                          color: rank <= 3 ? 'white' : '#667eea',
                           fontSize: '0.875rem',
                           fontWeight: '600',
                         }}
@@ -556,11 +553,12 @@ const FirstWeekChallenge = () => {
                       <span
                         style={{
                           padding: '0.25rem 0.5rem',
-                          borderRadius: '8px',
+                          borderRadius: '6px',
                           fontSize: '0.75rem',
                           fontWeight: '500',
                           backgroundColor: getTeamColors(athlete.team).bg,
                           color: getTeamColors(athlete.team).text,
+                          border: '1px solid #e2e8f0',
                         }}
                       >
                         {athlete.team}
@@ -657,12 +655,14 @@ const FirstWeekChallenge = () => {
                           >
                             {athlete.activities.map(
                               (activity, activityIndex) => {
-                                const activityDate = parseDateField(
-                                  activity.date || activity.date_fetch
-                                );
-                                const activityDistanceKm = (
-                                  (activity.distance || 0) / 1000
-                                ).toFixed(2);
+                                const dateField =
+                                  activity.date ||
+                                  activity.date_committed ||
+                                  activity.date_fetch ||
+                                  activity.daymonth;
+                                const parsedDate = parseDateField(dateField);
+                                const formattedDate =
+                                  parsedDate?.formattedDate || 'Unknown';
 
                                 return (
                                   <div
@@ -699,40 +699,42 @@ const FirstWeekChallenge = () => {
                                             color: '#718096',
                                           }}
                                         >
-                                          {activityDate?.formattedDate ||
-                                            'Unknown Date'}
+                                          {formattedDate} • {activity.type}
                                         </div>
                                       </div>
                                       <div
                                         style={{
                                           textAlign: 'right',
-                                          fontWeight: '600',
-                                          color: '#2d3748',
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          gap: '0.25rem',
                                         }}
                                       >
-                                        {activityDistanceKm} km
+                                        <div
+                                          style={{
+                                            fontWeight: '600',
+                                            color: '#2d3748',
+                                            fontSize: '0.875rem',
+                                          }}
+                                        >
+                                          {(activity.distance / 1000).toFixed(
+                                            2
+                                          )}{' '}
+                                          km
+                                        </div>
+                                        <div
+                                          style={{
+                                            fontWeight: '500',
+                                            color: '#718096',
+                                            fontSize: '0.75rem',
+                                          }}
+                                        >
+                                          {Math.round(
+                                            activity.moving_time / 60
+                                          )}{' '}
+                                          min
+                                        </div>
                                       </div>
-                                    </div>
-                                    <div
-                                      style={{
-                                        display: 'flex',
-                                        gap: '1rem',
-                                        fontSize: '0.75rem',
-                                        color: '#718096',
-                                      }}
-                                    >
-                                      <span>
-                                        ⏱️{' '}
-                                        {Math.round(
-                                          (activity.moving_time || 0) / 60
-                                        )}{' '}
-                                        min
-                                      </span>
-                                      <span>
-                                        📈 {activity.total_elevation_gain || 0}m
-                                        elevation
-                                      </span>
-                                      <span>🚶 {activity.type || 'Walk'}</span>
                                     </div>
                                   </div>
                                 );
@@ -753,4 +755,4 @@ const FirstWeekChallenge = () => {
   );
 };
 
-export default FirstWeekChallenge;
+export default Week2Challenge;
